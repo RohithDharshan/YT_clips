@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Ray — AI Video Clipper</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #7c5cfc;
+      --accent2: #fc5caa;
+      --text: #e8e8f0;
+      --muted: #6e6e88;
+      --success: #3dd68c;
+      --warn: #fcb25c;
+      --danger: #fc5c5c;
+      --card: #14141f;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    main {
+      width: 100%;
+      max-width: 900px;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 18px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"], input[type="number"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 12px 16px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="number"] { width: 90px; flex: none; }
+
+    .pill-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      padding: 8px 16px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .pill:hover { border-color: var(--accent); color: var(--text); }
+    .pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .custom-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .custom-row.show { opacity: 1; pointer-events: all; }
+    .custom-row span { color: var(--muted); font-size: 13px; }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .control-block label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid var(--border);
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(124,92,252,0.06);
+    }
+    .upload-zone input { display: none; }
+    .upload-zone .icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-zone p { color: var(--muted); font-size: 13px; }
+    .upload-zone .filename { color: var(--accent); font-size: 14px; margin-top: 6px; font-weight: 500; }
+
+    .btn {
+      padding: 13px 28px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #6a4de0; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.45; pointer-events: none; }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+    .clips-label {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .clips-count {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      width: 60px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+
+    /* Progress */
+    #progress-section { display: none; }
+    .progress-bar-wrap {
+      background: var(--bg);
+      border-radius: 100px;
+      height: 6px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 100px;
+      transition: width 0.4s;
+      width: 0%;
+    }
+    .progress-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+      text-transform: capitalize;
+    }
+
+    /* Results */
+    #results-section { display: none; }
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .results-header h2 { color: var(--text); font-size: 18px; }
+
+    .clip-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    .clip-card:hover { border-color: var(--accent); }
+
+    .clip-inner {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 20px;
+      padding: 20px;
+      align-items: center;
+    }
+
+    .rank-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .clip-info .clip-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .clip-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .clip-meta span {
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .clip-caption {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .score-ring {
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .score-ring .score-val {
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .score-ring .score-lbl {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    video.preview {
+      width: 100%;
+      border-top: 1px solid var(--border);
+      display: block;
+      background: #000;
+      max-height: 300px;
+      object-fit: contain;
+    }
+
+    .clip-actions {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      background: var(--surface);
+    }
+
+    .error-msg {
+      background: rgba(252,92,92,0.1);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 14px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .controls-grid { grid-template-columns: 1fr; }
+      .clip-inner { grid-template-columns: auto 1fr; }
+      .score-ring { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="logo">Project Ray ✦</div>
+      <div class="tagline">AI-powered short-form clip generator</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Input -->
+    <div class="card" id="input-card">
+      <h2>Input</h2>
+
+      <div class="input-row">
+        <input type="text" id="yt-url" placeholder="Paste YouTube URL…" />
+        <button class="btn btn-primary" onclick="submitYoutube()" id="yt-btn">Generate Clips</button>
+      </div>
+
+      <div id="url-error" class="error-msg"></div>
+
+      <div class="divider" style="margin: 24px 0;">or upload a file</div>
+
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.webm" onchange="fileSelected(this)" />
+        <div class="icon">📁</div>
+        <p>Drop a video or click to browse</p>
+        <p style="font-size:12px; margin-top:4px;">MP4 · MOV · MKV · WEBM</p>
+        <div class="filename" id="file-name"></div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="controls-grid">
+        <div class="control-block">
+          <label>Clip Duration</label>
+          <div class="pill-group" id="duration-group">
+            <div class="pill" data-val="<30s" onclick="setPill('duration', this)">&lt; 30s</div>
+            <div class="pill active" data-val="<1min" onclick="setPill('duration', this)">&lt; 1 min</div>
+            <div class="pill" data-val="custom" onclick="setPill('duration', this)">Custom</div>
+          </div>
+          <div class="custom-row" id="duration-custom">
+            <input type="number" id="dur-min" value="30" min="5" max="300" placeholder="min" />
+            <span>–</span>
+            <input type="number" id="dur-max" value="90" min="10" max="600" placeholder="max" />
+            <span>seconds</span>
+          </div>
+        </div>
+
+        <div class="control-block">
+          <label>Aspect Ratio</label>
+          <div class="pill-group" id="ratio-group">
+            <div class="pill active" data-val="9:16" onclick="setPill('ratio', this)">9:16</div>
+            <div class="pill" data-val="1:1" onclick="setPill('ratio', this)">1:1</div>
+            <div class="pill" data-val="16:9" onclick="setPill('ratio', this)">16:9</div>
+            <div class="pill" data-val="custom" onclick="setPill('ratio', this)">Custom</div>
+          </div>
+          <div class="custom-row" id="ratio-custom">
+            <input type="number" id="ratio-w" value="9" min="1" max="100" />
+            <span>:</span>
+            <input type="number" id="ratio-h" value="16" min="1" max="100" />
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; display:flex; align-items:center; gap:12px;">
+        <label class="clips-label">Number of clips:</label>
+        <input class="clips-count" type="number" id="num-clips" value="5" min="1" max="10" />
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="progress-section">
+      <h2>Processing</h2>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-label" id="progress-label">Starting…</div>
+    </div>
+
+    <!-- Results -->
+    <div id="results-section">
+      <div class="results-header">
+        <h2>Generated Clips</h2>
+        <button class="btn btn-outline" onclick="regenerate()">↺ Regenerate with new settings</button>
+      </div>
+      <div id="clips-list"></div>
+    </div>
+  </main>
+
+  <script>
+    const API = "http://localhost:8000";
+    let currentJobId = null;
+    let pollTimer = null;
+    let selectedFile = null;
+    let durationPreset = "<1min";
+    let ratioPreset = "9:16";
+
+    function setPill(group, el) {
+      document.querySelectorAll(`#${group}-group .pill`).forEach(p => p.classList.remove("active"));
+      el.classList.add("active");
+      const val = el.dataset.val;
+
+      if (group === "duration") {
+        durationPreset = val;
+        document.getElementById("duration-custom").classList.toggle("show", val === "custom");
+      } else {
+        ratioPreset = val;
+        document.getElementById("ratio-custom").classList.toggle("show", val === "custom");
+      }
+    }
+
+    function fileSelected(input) {
+      selectedFile = input.files[0];
+      document.getElementById("file-name").textContent = selectedFile ? selectedFile.name : "";
+    }
+
+    // Drag-and-drop
+    const dz = document.getElementById("drop-zone");
+    dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+    dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+    dz.addEventListener("drop", e => {
+      e.preventDefault();
+      dz.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f) {
+        selectedFile = f;
+        document.getElementById("file-name").textContent = f.name;
+        submitUpload();
+      }
+    });
+
+    function buildParams() {
+      return {
+        duration_preset: durationPreset,
+        duration_min: durationPreset === "custom" ? parseInt(document.getElementById("dur-min").value) : null,
+        duration_max: durationPreset === "custom" ? parseInt(document.getElementById("dur-max").value) : null,
+        aspect_ratio: ratioPreset,
+        ratio_w: ratioPreset === "custom" ? parseInt(document.getElementById("ratio-w").value) : null,
+        ratio_h: ratioPreset === "custom" ? parseInt(document.getElementById("ratio-h").value) : null,
+        num_clips: parseInt(document.getElementById("num-clips").value),
+      };
+    }
+
+    async function submitYoutube() {
+      const url = document.getElementById("yt-url").value.trim();
+      if (!url) return showError("url-error", "Please enter a YouTube URL.");
+      hideError("url-error");
+
+      const params = buildParams();
+      const res = await fetch(`${API}/api/process/youtube`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, ...params }),
+      });
+      const data = await res.json();
+      startPolling(data.job_id);
+    }
+
+    async function submitUpload() {
+      if (!selectedFile) return;
+      const params = buildParams();
+      const fd = new FormData();
+      fd.append("file", selectedFile);
+      Object.entries(params).forEach(([k, v]) => { if (v !== null) fd.append(k, v); });
+
+      const res = await fetch(`${API}/api/process/upload`, { method: "POST", body: fd });
+      const data = await res.json();
+      startPolling(data.job_id);
+    }
+
+    async function regenerate() {
+      if (!currentJobId) return;
+      const params = buildParams();
+      const res = await fetch(`${API}/api/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_id: currentJobId, ...params }),
+      });
+      const data = await res.json();
+      startPolling(data.job_id);
+    }
+
+    function startPolling(jobId) {
+      currentJobId = jobId;
+      if (pollTimer) clearInterval(pollTimer);
+      document.getElementById("progress-section").style.display = "block";
+      document.getElementById("results-section").style.display = "none";
+      document.getElementById("clips-list").innerHTML = "";
+      pollTimer = setInterval(() => pollStatus(jobId), 1500);
+    }
+
+    async function pollStatus(jobId) {
+      const res = await fetch(`${API}/api/status/${jobId}`);
+      const data = await res.json();
+
+      const bar = document.getElementById("progress-bar");
+      const lbl = document.getElementById("progress-label");
+
+      bar.style.width = (data.progress || 0) + "%";
+      lbl.textContent = statusLabel(data.status);
+
+      if (data.status === "done") {
+        clearInterval(pollTimer);
+        renderClips(data.clips);
+      } else if (data.status === "error") {
+        clearInterval(pollTimer);
+        const raw = data.error || "Unknown error";
+        let friendly = raw;
+        if (raw.includes("Sign In") || raw.includes("sign-in") || raw.includes("login")) {
+          friendly = "This video requires YouTube sign-in. Try a public video URL, or make sure you're logged into YouTube in Safari/Chrome on this Mac.";
+        } else if (raw.includes("Private video")) {
+          friendly = "This video is private and cannot be downloaded.";
+        } else if (raw.includes("age")) {
+          friendly = "This video is age-restricted. Trying a public video instead will work.";
+        } else if (raw.includes("not found") || raw.includes("404")) {
+          friendly = "Video not found. Check the URL and try again.";
+        }
+        lbl.textContent = friendly;
+        lbl.style.color = "var(--danger)";
+      }
+    }
+
+    function statusLabel(s) {
+      return {
+        queued: "Queued…",
+        downloading: "Downloading video…",
+        transcribing: "Transcribing audio…",
+        analyzing: "Analyzing highlights…",
+        generating: "Generating clips…",
+        regenerating: "Regenerating clips…",
+        done: "Done!",
+      }[s] || s;
+    }
+
+    function renderClips(clips) {
+      document.getElementById("results-section").style.display = "block";
+      const list = document.getElementById("clips-list");
+      list.innerHTML = "";
+
+      clips.forEach(clip => {
+        const card = document.createElement("div");
+        card.className = "clip-card";
+
+        const scorePercent = Math.round(clip.score * 100);
+
+        card.innerHTML = `
+          <div class="clip-inner">
+            <div class="rank-badge">#${clip.rank}</div>
+            <div class="clip-info">
+              <div class="clip-title">${escHtml(clip.title)}</div>
+              <div class="clip-meta">
+                <span>⏱ ${clip.duration}s</span>
+                <span>⭐ Score ${scorePercent}%</span>
+                <span>🕐 ${fmtTime(clip.start)} → ${fmtTime(clip.end)}</span>
+              </div>
+              <div class="clip-caption">${escHtml(clip.caption)}</div>
+            </div>
+            <div class="score-ring">
+              <div class="score-val">${scorePercent}%</div>
+              <div class="score-lbl">relevance</div>
+            </div>
+          </div>
+          <video class="preview" controls preload="metadata" src="${API}${clip.clip_url}"></video>
+          <div class="clip-actions">
+            <a href="${API}${clip.clip_url}" download class="btn btn-primary" style="text-decoration:none;font-size:13px;">⬇ Download</a>
+            <button class="btn btn-outline" style="font-size:13px;" onclick="copyCaption(this, ${JSON.stringify(clip.caption)})">Copy caption</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+
+      document.getElementById("results-section").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function copyCaption(btn, text) {
+      navigator.clipboard.writeText(text);
+      btn.textContent = "✓ Copied!";
+      setTimeout(() => btn.textContent = "Copy caption", 2000);
+    }
+
+    function fmtTime(secs) {
+      const m = Math.floor(secs / 60).toString().padStart(2, "0");
+      const s = Math.floor(secs % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function escHtml(t) {
+      return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+
+    function hideError(id) {
+      document.getElementById(id).style.display = "none";
+    }
+  </script>
+</body>
+</html>

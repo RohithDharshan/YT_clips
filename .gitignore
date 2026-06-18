@@ -1,0 +1,12 @@
+backend/.venv/
+cache/
+clips/
+__pycache__/
+*.pyc
+*.pyo
+*.wav
+*.part
+.DS_Store
+youtube_cookies.txt
+*.json.lock
+ruvector.db
