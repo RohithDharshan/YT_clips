@@ -460,7 +460,8 @@
   </main>
 
   <script>
-    const API = "http://localhost:8000";
+    // Use VITE_API_URL env var (set in Vercel dashboard) or fall back to localhost
+    const API = window.__API_URL__ || "http://localhost:8000";
     let currentJobId = null;
     let pollTimer = null;
     let selectedFile = null;
