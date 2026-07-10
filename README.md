@@ -1,6 +1,6 @@
-# Project Ray — AI Video Clipper
+# Project Ray — AI Clip Studio
 
-An AI-powered short-form video clip generator. Paste a YouTube URL or upload a video and get ranked, captioned, watermarked clips ready to post.
+An AI-powered short-form clip studio. Paste a YouTube URL or upload a video, and get ranked, reframed, captioned clips — then fine-tune each one in a built-in editor before you post.
 
 ## Quick Start
 
@@ -12,22 +12,43 @@ brew install ffmpeg
 ./start.sh
 ```
 
-Open http://localhost:3000 in your browser.
+Open http://localhost:3000 in your browser. If port 8000 is busy, the API automatically starts on 8010 and the frontend finds it on its own.
 
 ## Pipeline
 
-1. **Download** — yt-dlp pulls the YouTube video (or you upload MP4/MOV/MKV)
+1. **Download** — yt-dlp pulls the YouTube video (or you upload MP4/MOV/MKV/WEBM)
 2. **Transcribe** — Whisper `base` model generates word-level timestamps
-3. **Score** — Each segment is scored on:
-   - Audio energy (RMS volume peaks)
-   - Scene cut frequency (shot boundary detection via OpenCV)
+3. **Subject analysis** — the video is analyzed *before* rendering to decide what to focus on:
+   - Face presence across sampled frames (MediaPipe) → talking-head videos track the speaker
+   - Dominant moving object vs. a median-frame background → cars, balls, action get tracked instead
+   - No clear subject → full-frame (Normal) is recommended
+   - The result is shown during processing and drives the **Auto** framing mode
+4. **Score** — Each segment is scored on:
+   - Audio energy + spectral flux (crowd roars, impacts)
+   - Scene cut frequency & motion (OpenCV)
    - Text signals (keyword density, questions, punchlines)
-4. **Clip** — Top-N segments are:
-   - Trimmed at natural sentence boundaries
-   - Reframed for the target aspect ratio with face-tracking pan (MediaPipe)
-   - Burned-in word-by-word highlight captions (PIL)
-   - Watermarked with "Project Ray" branding
-5. **Cache** — transcript + scores are cached 6 hours so you can regenerate with different settings instantly
+   - Hook strength ("what if…", "here's why…", question openers)
+   - Climax moments (wins, overtakes, goals, emotional peaks — heavily weighted)
+   - Videos with no speech fall back to audio/motion-scored windows
+5. **Render** — Top-N segments are rendered in a single pass:
+   - **Framing**: `auto` (use the subject analysis), `fit` (Normal — full frame) or `fill` (Focus — smoothed crop tracking the face *or* the moving subject, whichever the analysis found)
+   - **Captions**: word-by-word highlight styles — `karaoke`, `bold`, `minimal`, or `none`
+   - **Watermark**: toggleable, custom text
+   - Per-clip thumbnail + virality score breakdown
+6. **Cache** — transcript + scores + subject analysis cached 24 h; jobs persist across server restarts
+
+## The Editor
+
+After processing you land in a full editor:
+
+- **Clip rail** — thumbnails, rank badges, scores; click to switch clips
+- **Preview player** — spacebar play/pause, playhead synced to the trim strip
+- **Trim strip** — drag in/out handles or slide the whole selection, then *Apply & re-render* that one clip (uses the cached analysis, no re-transcribe)
+- **Inspector** — per-clip caption style, framing, aspect ratio, watermark; *Regenerate all* applies everywhere
+- **Transcript tab** — click a line to seek; clicking a line outside the clip extends the trim to include it
+- **Analytics tab** — hook / climax / audio / scene / text score breakdown
+- **Source heatmap** — the whole video's highlight scores with clip regions; click to jump between clips
+- **Export** — download a single clip or all of them as a ZIP
 
 ## Controls
 
@@ -35,6 +56,9 @@ Open http://localhost:3000 in your browser.
 |---|---|
 | Duration | <30s · <1min · Custom (min–max seconds) |
 | Aspect Ratio | 9:16 · 1:1 · 16:9 · Custom W:H |
+| Framing | Auto (AI decides from analysis) · Normal (full frame) · Focus subject (tracked crop) |
+| Captions | Karaoke · Bold · Minimal · None |
+| Watermark | On/off + custom text |
 | Number of clips | 1–10 (default 5) |
 
 ## API Endpoints
@@ -42,13 +66,18 @@ Open http://localhost:3000 in your browser.
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/process/youtube` | Submit YouTube URL |
-| POST | `/api/process/upload` | Upload video file |
-| POST | `/api/regenerate` | Regenerate clips with new settings (uses cache) |
-| GET | `/api/status/{job_id}` | Poll job status + results |
+| POST | `/api/process/upload` | Upload video file (multipart form) |
+| POST | `/api/regenerate` | Regenerate all clips with new settings (uses cache) |
+| POST | `/api/clip/rerender` | Re-render one clip with new trim/style |
+| GET | `/api/status/{job_id}` | Poll job status, progress detail + results |
+| GET | `/api/transcript/{job_id}` | Full transcript + scored segments |
+| GET | `/api/jobs` | Recent projects |
+| GET | `/api/download/{job_id}.zip` | All clips as a ZIP |
+| DELETE | `/api/job/{job_id}` | Delete a job and its clips |
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.10–3.12
 - ffmpeg
 - ~4 GB RAM (Whisper base model)
 - GPU optional (CPU runs fine, slower)

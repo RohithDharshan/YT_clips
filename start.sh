@@ -56,7 +56,15 @@ pip install -q -r "$BACKEND/requirements.txt"
 
 echo "🚀 Starting Project Ray API..."
 cd "$BACKEND"
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+# Pick the first free API port (another app may already own 8000)
+API_PORT=8000
+for p in 8000 8010 8001; do
+  if ! lsof -i ":$p" -sTCP:LISTEN &>/dev/null; then
+    API_PORT=$p
+    break
+  fi
+done
+uvicorn main:app --host 0.0.0.0 --port "$API_PORT" --reload &
 API_PID=$!
 
 echo "🌐 Starting frontend server..."
@@ -67,7 +75,7 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Project Ray is running!"
 echo "   Frontend → http://localhost:3000"
-echo "   API      → http://localhost:8000"
+echo "   API      → http://localhost:$API_PORT"
 echo ""
 echo "Press Ctrl+C to stop."
 

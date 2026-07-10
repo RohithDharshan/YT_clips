@@ -32,10 +32,22 @@ CLIMAX_KEYWORDS = [
 ]
 
 
+# Hook phrases — strong short-form openers get a dedicated boost
+HOOK_PATTERNS = [
+    "what if", "imagine", "here's", "heres", "did you know", "the reason",
+    "nobody tells", "no one tells", "stop doing", "before you", "watch this",
+    "let me show", "i'm going to", "im going to", "how to", "why you",
+    "the biggest", "the best", "the worst", "you need to",
+]
+
+
 def score_segments(video_path: str, audio_path: str, transcript: list) -> list:
+    if not transcript:
+        return _fallback_segments(video_path, audio_path)
+
     audio_scores, excitement_scores = _score_audio(audio_path, transcript)
     scene_scores = _score_scenes(video_path, transcript)
-    text_scores, climax_scores = _score_text(transcript)
+    text_scores, climax_scores, hook_scores = _score_text(transcript)
 
     scored = []
     for i, seg in enumerate(transcript):
@@ -50,14 +62,16 @@ def score_segments(video_path: str, audio_path: str, transcript: list) -> list:
         scene_s = scene_scores.get(i, 0.0)
         text_s = text_scores.get(i, 0.0)
         climax_s = climax_scores.get(i, 0.0)
+        hook_s = hook_scores.get(i, 0.0)
 
-        # Climax score dominates — winning/dramatic moments always rise to top
+        # Climax dominates; hooks give a meaningful edge for short-form openers
         score = (
-            audio_s   * 0.15 +
-            excite_s  * 0.15 +
-            scene_s   * 0.10 +
+            audio_s   * 0.13 +
+            excite_s  * 0.13 +
+            scene_s   * 0.09 +
             text_s    * 0.10 +
-            climax_s  * 0.50
+            hook_s    * 0.10 +
+            climax_s  * 0.45
         )
 
         scored.append({
@@ -71,6 +85,50 @@ def score_segments(video_path: str, audio_path: str, transcript: list) -> list:
             "scene_score": round(scene_s, 4),
             "text_score": round(text_s, 4),
             "climax_score": round(climax_s, 4),
+            "hook_score": round(hook_s, 4),
+        })
+
+    return sorted(scored, key=lambda x: x["score"], reverse=True)
+
+
+def _fallback_segments(video_path: str, audio_path: str) -> list:
+    """No speech detected — build fixed windows scored on audio energy + motion."""
+    y, sr = librosa.load(audio_path, sr=16000, mono=True)
+    duration = len(y) / sr
+    if duration < 4:
+        return []
+
+    rms = librosa.feature.rms(y=y, frame_length=512, hop_length=256)[0]
+    times = librosa.frames_to_time(np.arange(len(rms)), sr=sr, hop_length=256)
+    rms_norm = (rms - rms.min()) / (rms.max() - rms.min() + 1e-8)
+
+    window, stride = 20.0, 10.0
+    pseudo = []
+    t = 0.0
+    while t < duration - 4:
+        end = min(t + window, duration)
+        pseudo.append({"start": t, "end": end, "text": "", "words": []})
+        t += stride
+
+    scene_scores = _score_scenes(video_path, pseudo)
+
+    scored = []
+    for i, seg in enumerate(pseudo):
+        mask = (times >= seg["start"]) & (times <= seg["end"])
+        audio_s = float(np.percentile(rms_norm[mask], 85)) if mask.sum() else 0.0
+        scene_s = scene_scores.get(i, 0.0)
+        scored.append({
+            "seg_index": i,
+            "start": round(seg["start"], 2),
+            "end": round(seg["end"], 2),
+            "text": "",
+            "words": [],
+            "score": round(audio_s * 0.55 + scene_s * 0.45, 4),
+            "audio_score": round(audio_s, 4),
+            "scene_score": round(scene_s, 4),
+            "text_score": 0.0,
+            "climax_score": 0.0,
+            "hook_score": 0.0,
         })
 
     return sorted(scored, key=lambda x: x["score"], reverse=True)
@@ -144,8 +202,8 @@ def _score_scenes(video_path: str, transcript: list) -> dict:
     return scores
 
 
-def _score_text(transcript: list) -> tuple[dict, dict]:
-    text_scores, climax_scores = {}, {}
+def _score_text(transcript: list) -> tuple[dict, dict, dict]:
+    text_scores, climax_scores, hook_scores = {}, {}, {}
 
     for i, seg in enumerate(transcript):
         text_lower = seg["text"].lower()
@@ -164,4 +222,17 @@ def _score_text(transcript: list) -> tuple[dict, dict]:
         # Climax score: first hit = 0.7, second = 1.0, capped at 1.0
         climax_scores[i] = min(climax_hits * 0.50, 1.0)
 
-    return text_scores, climax_scores
+        # Hook score: opener phrases anywhere in the segment; strongest when
+        # the segment *starts* with one
+        hook = 0.0
+        for pattern in HOOK_PATTERNS:
+            if text_lower.strip().startswith(pattern):
+                hook = 1.0
+                break
+            if pattern in text_lower:
+                hook = max(hook, 0.6)
+        if has_question:
+            hook = max(hook, 0.4)
+        hook_scores[i] = hook
+
+    return text_scores, climax_scores, hook_scores

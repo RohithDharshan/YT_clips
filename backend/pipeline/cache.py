@@ -3,7 +3,7 @@ import os
 import time
 
 CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../cache/analysis"))
-TTL = 3600 * 6  # 6 hours
+TTL = 3600 * 24  # 24 hours — keeps the editor usable for a full working day
 
 
 def _path(job_id: str) -> str:
