@@ -56,7 +56,7 @@ After processing you land in a full editor:
 |---|---|
 | Duration | <30s · <1min · Custom (min–max seconds) |
 | Aspect Ratio | 9:16 · 1:1 · 16:9 · Custom W:H |
-| Framing | Auto (AI decides from analysis) · Normal (full frame) · Focus subject (tracked crop) |
+| Framing | Auto (AI decides from analysis) · Normal (full frame) · Focus subject (tracked crop) · Manual (crop position, zoom 1–4×, 3×3 grid placement, rotation ±45°) |
 | Captions | Karaoke · Bold · Minimal · None |
 | Watermark | On/off + custom text |
 | Number of clips | 1–10 (default 5) |

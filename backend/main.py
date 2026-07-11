@@ -79,10 +79,15 @@ class ClipSettings(BaseModel):
     ratio_w: Optional[int] = None
     ratio_h: Optional[int] = None
     num_clips: int = 5
-    framing: str = "auto"                   # "auto" (use analysis), "fit" (normal), "fill" (focus subject)
+    framing: str = "auto"                   # "auto" (use analysis), "fit" (normal), "fill" (focus subject), "manual"
     caption_style: str = "karaoke"          # "karaoke", "bold", "minimal", "none"
     watermark: bool = True
     watermark_text: Optional[str] = None
+    # manual framing controls (used when framing == "manual")
+    crop_x: float = 0.5                     # crop-window center, fraction of source width
+    crop_y: float = 0.5                     # crop-window center, fraction of source height
+    zoom: float = 1.0                       # 1.0 (widest) … 4.0 (4x punch-in)
+    rotate: float = 0.0                     # degrees, -45 … 45
 
 
 class YouTubeRequest(ClipSettings):
@@ -204,6 +209,30 @@ async def rerender_clip(req: RerenderRequest):
         _save_jobs()
 
     return {"clip": clip}
+
+
+@app.get("/api/frame/{job_id}")
+async def get_source_frame(job_id: str, t: float = 0.0):
+    """A single source-video frame, used by the manual crop editor."""
+    cached = get_cache(job_id)
+    if not cached or not os.path.exists(cached.get("video_path", "")):
+        raise HTTPException(404, "Source video not available")
+
+    t = max(0.0, float(t))
+    frame_path = os.path.join(EXPORT_DIR, f"{job_id}_frame_{t:.1f}.jpg")
+    if not os.path.exists(frame_path):
+        def extract():
+            import subprocess
+            subprocess.run([
+                "ffmpeg", "-y", "-ss", str(t), "-i", cached["video_path"],
+                "-vframes", "1", "-vf", "scale=720:-2", "-q:v", "5", frame_path,
+            ], check=True, capture_output=True)
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, extract)
+        except Exception:
+            raise HTTPException(500, "Could not extract frame")
+
+    return FileResponse(frame_path, media_type="image/jpeg")
 
 
 @app.get("/api/transcript/{job_id}")

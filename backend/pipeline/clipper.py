@@ -178,6 +178,13 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
         # Use the subject analysis: focus when there is something to focus on
         framing = focus.get("recommend", "fit")
 
+    manual = {
+        "crop_x": getattr(req, "crop_x", 0.5),
+        "crop_y": getattr(req, "crop_y", 0.5),
+        "zoom": getattr(req, "zoom", 1.0),
+        "rotate": getattr(req, "rotate", 0.0),
+    }
+
     trimmed = _trim_video(video_path, start, end)
     try:
         _compose(
@@ -188,6 +195,7 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
             caption_style=caption_style,
             watermark_text=watermark_text if watermark_on else None,
             focus_subject=focus_subject,
+            manual=manual,
         )
     finally:
         if os.path.exists(trimmed):
@@ -208,16 +216,17 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
         "duration": round(end - start, 1),
         "settings": {
             "aspect_ratio": f"{ratio_w}:{ratio_h}",
-            "framing": framing,  # resolved: "fit" or "fill", never "auto"
+            "framing": framing,  # resolved: "fit", "fill" or "manual", never "auto"
             "focus_subject": focus_subject,
             "caption_style": caption_style,
             "watermark": bool(watermark_on),
+            "manual": {k: round(float(v or 0), 3) for k, v in manual.items()},
         },
     }
 
 
 def _compose(src, dst, ratio_w, ratio_h, framing, words, caption_style, watermark_text,
-             focus_subject="face"):
+             focus_subject="face", manual=None):
     """Single cv2 pass: reframe + captions + watermark, then mux audio + encode."""
     out_w, out_h = _compute_output_size_from_ratio(ratio_w, ratio_h)
 
@@ -226,8 +235,15 @@ def _compose(src, dst, ratio_w, ratio_h, framing, words, caption_style, watermar
     src_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
 
-    tracker = (_SubjectTracker(src, src_w, src_h, out_w, out_h, subject=focus_subject)
-               if framing == "fill" else None)
+    tracker = None
+    if framing == "fill":
+        tracker = _SubjectTracker(src, src_w, src_h, out_w, out_h, subject=focus_subject)
+    elif framing == "manual":
+        manual = manual or {}
+        tracker = _ManualCropper(
+            src_w, src_h, out_w, out_h,
+            crop_x=manual.get("crop_x", 0.5), crop_y=manual.get("crop_y", 0.5),
+            zoom=manual.get("zoom", 1.0), rotate=manual.get("rotate", 0.0))
 
     pages = _build_caption_pages(words, caption_style) if words else []
     overlays = _prerender_caption_overlays(pages, caption_style, out_w, out_h, ratio_w, ratio_h)
@@ -275,6 +291,54 @@ def _compose(src, dst, ratio_w, ratio_h, framing, words, caption_style, watermar
         dst,
     ], check=True, capture_output=True)
     os.remove(tmp_video)
+
+
+class _ManualCropper:
+    """User-defined crop window: center position, zoom and rotation.
+
+    crop_x/crop_y are the window center as fractions of the source frame,
+    zoom scales the window down from the largest crop that fits the target
+    ratio (1.0 = widest view, 4.0 = 4x punch-in), rotate is in degrees.
+    """
+
+    def __init__(self, src_w, src_h, out_w, out_h,
+                 crop_x=0.5, crop_y=0.5, zoom=1.0, rotate=0.0):
+        self.src_w, self.src_h = src_w, src_h
+        self.out_w, self.out_h = out_w, out_h
+
+        target_r = out_w / out_h
+        src_r = src_w / src_h
+        if src_r > target_r:
+            base_h, base_w = src_h, src_h * target_r
+        else:
+            base_w, base_h = src_w, src_w / target_r
+
+        zoom = min(max(float(zoom or 1.0), 1.0), 4.0)
+        self.crop_w = max(int(base_w / zoom), 16)
+        self.crop_h = max(int(base_h / zoom), 16)
+
+        cx = min(max(float(crop_x if crop_x is not None else 0.5), 0.0), 1.0) * src_w
+        cy = min(max(float(crop_y if crop_y is not None else 0.5), 0.0), 1.0) * src_h
+        self.x0 = int(np.clip(cx - self.crop_w / 2, 0, src_w - self.crop_w))
+        self.y0 = int(np.clip(cy - self.crop_h / 2, 0, src_h - self.crop_h))
+
+        self.rot_matrix = None
+        rotate = float(rotate or 0.0)
+        if abs(rotate) > 0.1:
+            center = (self.x0 + self.crop_w / 2, self.y0 + self.crop_h / 2)
+            # Scale up slightly so rotation doesn't reveal black corners
+            pad_scale = 1.0 + abs(np.sin(np.radians(rotate))) * 0.8
+            self.rot_matrix = cv2.getRotationMatrix2D(center, rotate, pad_scale)
+
+    def crop(self, frame, frame_idx):
+        if self.rot_matrix is not None:
+            frame = cv2.warpAffine(frame, self.rot_matrix, (self.src_w, self.src_h),
+                                   flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        window = frame[self.y0:self.y0 + self.crop_h, self.x0:self.x0 + self.crop_w]
+        return cv2.resize(window, (self.out_w, self.out_h), interpolation=cv2.INTER_AREA)
+
+    def close(self):
+        pass
 
 
 def _fit_pad(frame, src_w, src_h, out_w, out_h):

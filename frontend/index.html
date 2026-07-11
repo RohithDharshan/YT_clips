@@ -311,6 +311,7 @@
       border-right: 1px solid var(--border);
       overflow-y: auto;
       padding: 14px;
+      grid-column: 1;
       grid-row: 1 / 3;
       background: var(--surface);
     }
@@ -347,6 +348,8 @@
     }
 
     .stage {
+      grid-column: 2;
+      grid-row: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -427,6 +430,7 @@
       border-left: 1px solid var(--border);
       background: var(--surface);
       overflow-y: auto;
+      grid-column: 3;
       grid-row: 1 / 3;
       display: flex;
       flex-direction: column;
@@ -459,6 +463,31 @@
     .score-row .sr-head .v { font-family: var(--mono); color: var(--text); }
     .score-track { height: 5px; background: var(--bg); border-radius: 100px; overflow: hidden; }
     .score-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s; }
+
+    .anchor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 18px);
+      grid-template-rows: repeat(3, 18px);
+      gap: 4px;
+    }
+    .anchor-cell {
+      background: var(--border-hi);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background .15s, transform .15s;
+    }
+    .anchor-cell:hover { background: var(--accent2); transform: scale(1.12); }
+    .anchor-cell.active { background: var(--accent); }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 10px;
+    }
+    .slider-row span { font-size: 11.5px; color: var(--muted); width: 42px; }
+    .slider-row b { font-size: 11.5px; font-family: var(--mono); color: var(--text); width: 42px; text-align: right; font-weight: 600; }
+    .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
 
     .transcript-seg {
       padding: 9px 12px;
@@ -511,6 +540,7 @@
     @media (max-width: 760px) {
       #view-editor.active { grid-template-columns: 1fr; }
       .clip-rail { display: none; }
+      .stage { grid-column: 1; }
       .timeline-footer { grid-column: 1 / -1; }
       .trim-head { flex-wrap: wrap; }
       .settings-grid, .style-cards { grid-template-columns: 1fr 1fr; }
@@ -593,8 +623,9 @@
             <div class="pill active" data-val="auto" title="The video is analyzed first — AI picks Normal or Focus based on what it finds">✨ Auto</div>
             <div class="pill" data-val="fit" title="Normal — full frame, letterboxed">Normal</div>
             <div class="pill" data-val="fill" title="Crop in and track the subject (face, car, action)">Focus subject</div>
+            <div class="pill" data-val="manual" title="Set crop, zoom, position grid and rotation yourself per clip in the editor">Manual edit</div>
           </div>
-          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Every video is analyzed first — Auto focuses on the face or the moving subject when one is found.</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Every video is analyzed first — Auto focuses on the face or the moving subject when one is found. Manual gives you crop, zoom, grid position &amp; rotation controls per clip in the editor.</div>
         </div>
 
         <div class="control-block">
@@ -720,8 +751,32 @@
           <div class="pill-group" id="ed-framing-group">
             <div class="pill" data-val="fit">Normal</div>
             <div class="pill" data-val="fill">Focus subject</div>
+            <div class="pill" data-val="manual">Manual</div>
           </div>
           <div id="focus-note-ed" style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
+
+          <div id="manual-panel" style="display:none;margin-top:12px;">
+            <canvas id="crop-canvas" style="width:100%;border-radius:8px;background:#000;cursor:grab;touch-action:none;display:block;"></canvas>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">Drag the window to reposition · use the grid for quick placement</div>
+            <div style="display:flex;gap:14px;margin-top:12px;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Grid</div>
+                <div class="anchor-grid" id="anchor-grid"></div>
+              </div>
+              <div style="flex:1;">
+                <div class="slider-row">
+                  <span>Zoom</span>
+                  <input type="range" id="zoom-range" min="1" max="4" step="0.05" value="1" />
+                  <b id="zoom-val">1.0×</b>
+                </div>
+                <div class="slider-row">
+                  <span>Rotate</span>
+                  <input type="range" id="rotate-range" min="-45" max="45" step="1" value="0" />
+                  <b id="rotate-val">0°</b>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="insp-section">
           <label>Aspect ratio</label>
@@ -845,8 +900,182 @@
     bindPills("caption-group", v => setup.caption = v);
 
     bindPills("ed-caption-group", v => { editorStyle.caption = v; markDirty(); });
-    bindPills("ed-framing-group", v => { editorStyle.framing = v; markDirty(); });
-    bindPills("ed-ratio-group", v => { editorStyle.ratio = v; markDirty(); });
+    bindPills("ed-framing-group", v => { editorStyle.framing = v; markDirty(); setFramingUI(); });
+    bindPills("ed-ratio-group", v => { editorStyle.ratio = v; markDirty(); drawCropCanvas(); });
+
+    // ---------- manual framing (crop / zoom / grid / rotate) ----------
+    const manual = { crop_x: 0.5, crop_y: 0.5, zoom: 1, rotate: 0 };
+    let cropImg = null;       // source frame for the crop editor
+    let cropImgJob = null;    // which job+clip the frame belongs to
+
+    function setFramingUI() {
+      const on = editorStyle.framing === "manual";
+      document.getElementById("manual-panel").style.display = on ? "block" : "none";
+      if (on) loadCropFrame();
+    }
+
+    function loadCropFrame() {
+      const key = currentJobId + ":" + selectedIdx;
+      if (cropImg && cropImgJob === key) { drawCropCanvas(); return; }
+      const mid = ((trim.start + trim.end) / 2).toFixed(1);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { cropImg = img; cropImgJob = key; drawCropCanvas(); };
+      img.onerror = () => { cropImg = null; drawCropCanvas(); };
+      img.src = `${API}/api/frame/${currentJobId}?t=${mid}`;
+    }
+
+    function cropRatio() {
+      const [rw, rh] = (editorStyle.ratio || "9:16").split(":").map(Number);
+      return (rw && rh) ? rw / rh : 9 / 16;
+    }
+
+    function cropRect(imgW, imgH) {
+      // largest window of target ratio, shrunk by zoom, centered on crop_x/y
+      const r = cropRatio();
+      let baseW, baseH;
+      if (imgW / imgH > r) { baseH = imgH; baseW = imgH * r; }
+      else { baseW = imgW; baseH = imgW / r; }
+      const w = baseW / manual.zoom, h = baseH / manual.zoom;
+      const cx = clamp(manual.crop_x * imgW, w / 2, imgW - w / 2);
+      const cy = clamp(manual.crop_y * imgH, h / 2, imgH - h / 2);
+      return { x: cx - w / 2, y: cy - h / 2, w, h };
+    }
+
+    function drawCropCanvas() {
+      const canvas = document.getElementById("crop-canvas");
+      if (!canvas || document.getElementById("manual-panel").style.display === "none") return;
+      const cssW = canvas.clientWidth || 280;
+      const aspect = cropImg ? cropImg.height / cropImg.width : 9 / 16;
+      const cssH = Math.min(cssW * aspect, 240);
+      canvas.style.height = cssH + "px";
+      const dpr = devicePixelRatio || 1;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const rect = cropRect(W, H);
+
+      // source frame, rotated around the window center like the render will be
+      if (cropImg) {
+        ctx.save();
+        if (manual.rotate) {
+          const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+          ctx.translate(cx, cy);
+          ctx.rotate(-manual.rotate * Math.PI / 180);
+          ctx.translate(-cx, -cy);
+        }
+        ctx.drawImage(cropImg, 0, 0, W, H);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#666";
+        ctx.font = `${12 * dpr}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("Source frame unavailable", W / 2, H / 2);
+      }
+
+      // dim everything outside the crop window
+      ctx.fillStyle = "rgba(0,0,0,.62)";
+      ctx.fillRect(0, 0, W, rect.y);
+      ctx.fillRect(0, rect.y + rect.h, W, H - rect.y - rect.h);
+      ctx.fillRect(0, rect.y, rect.x, rect.h);
+      ctx.fillRect(rect.x + rect.w, rect.y, W - rect.x - rect.w, rect.h);
+
+      // window border + rule-of-thirds grid
+      ctx.strokeStyle = "#7c5cfc";
+      ctx.lineWidth = 2 * dpr;
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = dpr;
+      for (let i = 1; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(rect.x + rect.w * i / 3, rect.y);
+        ctx.lineTo(rect.x + rect.w * i / 3, rect.y + rect.h);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(rect.x, rect.y + rect.h * i / 3);
+        ctx.lineTo(rect.x + rect.w, rect.y + rect.h * i / 3);
+        ctx.stroke();
+      }
+    }
+
+    // drag the crop window
+    (() => {
+      const canvas = document.getElementById("crop-canvas");
+      let dragging = null;
+      canvas.addEventListener("pointerdown", e => {
+        dragging = { x: e.clientX, y: e.clientY, ox: manual.crop_x, oy: manual.crop_y };
+        canvas.setPointerCapture(e.pointerId);
+        canvas.style.cursor = "grabbing";
+      });
+      canvas.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        manual.crop_x = clamp(dragging.ox + (e.clientX - dragging.x) / canvas.clientWidth, 0, 1);
+        manual.crop_y = clamp(dragging.oy + (e.clientY - dragging.y) / canvas.clientHeight, 0, 1);
+        syncAnchorGrid();
+        markDirty();
+        drawCropCanvas();
+      });
+      const stop = () => { dragging = null; canvas.style.cursor = "grab"; };
+      canvas.addEventListener("pointerup", stop);
+      canvas.addEventListener("pointercancel", stop);
+    })();
+
+    // 3x3 anchor grid for quick placement
+    const ANCHOR_VALS = [0.17, 0.5, 0.83];
+    (() => {
+      const grid = document.getElementById("anchor-grid");
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const cell = document.createElement("div");
+          cell.className = "anchor-cell";
+          cell.title = ["Top", "Middle", "Bottom"][row] + " " + ["left", "center", "right"][col];
+          cell.dataset.x = ANCHOR_VALS[col];
+          cell.dataset.y = ANCHOR_VALS[row];
+          cell.onclick = () => {
+            manual.crop_x = parseFloat(cell.dataset.x);
+            manual.crop_y = parseFloat(cell.dataset.y);
+            syncAnchorGrid();
+            markDirty();
+            drawCropCanvas();
+          };
+          grid.appendChild(cell);
+        }
+      }
+    })();
+
+    function syncAnchorGrid() {
+      document.querySelectorAll(".anchor-cell").forEach(c => {
+        c.classList.toggle("active",
+          Math.abs(parseFloat(c.dataset.x) - manual.crop_x) < 0.08 &&
+          Math.abs(parseFloat(c.dataset.y) - manual.crop_y) < 0.08);
+      });
+    }
+
+    document.getElementById("zoom-range").addEventListener("input", e => {
+      manual.zoom = parseFloat(e.target.value);
+      document.getElementById("zoom-val").textContent = manual.zoom.toFixed(2).replace(/0$/, "") + "×";
+      markDirty();
+      drawCropCanvas();
+    });
+    document.getElementById("rotate-range").addEventListener("input", e => {
+      manual.rotate = parseInt(e.target.value);
+      document.getElementById("rotate-val").textContent = manual.rotate + "°";
+      markDirty();
+      drawCropCanvas();
+    });
+
+    function syncManualControls() {
+      document.getElementById("zoom-range").value = manual.zoom;
+      document.getElementById("zoom-val").textContent = manual.zoom.toFixed(2).replace(/0$/, "") + "×";
+      document.getElementById("rotate-range").value = manual.rotate;
+      document.getElementById("rotate-val").textContent = manual.rotate + "°";
+      syncAnchorGrid();
+    }
 
     // ---------- views ----------
     function showView(name) {
@@ -1098,8 +1327,15 @@
         editorStyle.framing = clip.settings.framing || editorStyle.framing;
         editorStyle.ratio = clip.settings.aspect_ratio || editorStyle.ratio;
         document.getElementById("ed-wm-toggle").checked = clip.settings.watermark !== false;
+        const m = clip.settings.manual || {};
+        manual.crop_x = m.crop_x ?? 0.5;
+        manual.crop_y = m.crop_y ?? 0.5;
+        manual.zoom = m.zoom || 1;
+        manual.rotate = m.rotate || 0;
         syncStylePills();
+        syncManualControls();
       }
+      setFramingUI();
 
       if (resetTrimWin) {
         const pad = 25;
@@ -1211,7 +1447,14 @@
       editorStyle.caption = clip.settings?.caption_style || "karaoke";
       editorStyle.framing = clip.settings?.framing || "fit";
       editorStyle.ratio = clip.settings?.aspect_ratio || "9:16";
+      const m = clip.settings?.manual || {};
+      manual.crop_x = m.crop_x ?? 0.5;
+      manual.crop_y = m.crop_y ?? 0.5;
+      manual.zoom = m.zoom || 1;
+      manual.rotate = m.rotate || 0;
       syncStylePills();
+      syncManualControls();
+      setFramingUI();
       clearDirty();
       layoutTrim();
     }
@@ -1249,6 +1492,10 @@
             caption_style: editorStyle.caption,
             watermark: document.getElementById("ed-wm-toggle").checked,
             watermark_text: document.getElementById("ed-wm-text").value || null,
+            crop_x: manual.crop_x,
+            crop_y: manual.crop_y,
+            zoom: manual.zoom,
+            rotate: manual.rotate,
           }),
         });
         if (!res.ok) {
