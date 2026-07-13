@@ -353,14 +353,28 @@ def _fit_pad(frame, src_w, src_h, out_w, out_h):
 
 
 class _SubjectTracker:
-    """Subject-tracked crop window with exponential smoothing.
+    """Shot-aware subject reframing (how pro auto-reframe behaves).
 
-    Follows faces when present; for "object" subjects (cars, balls, action)
-    it follows the dominant moving blob via background subtraction. Falls
-    back to holding the last known center.
+    Instead of chasing detections frame-by-frame (which makes fast footage
+    like sports/F1 swim and drift), the clip is pre-analyzed once:
+
+      1. Scene cuts are detected, splitting the clip into shots.
+      2. Each shot gets a stable crop center — the median of face /
+         moving-object detections inside that shot. Long shots with a
+         drifting subject get a few keyframes and pan slowly between them.
+      3. Shots with no reliable subject stay center-framed.
+
+    The crop is locked within a shot, jumps instantly at cuts, and pan
+    speed is clamped — the result is steady and watchable even when the
+    source is rapid and chaotic.
     """
 
-    DETECT_EVERY = 6  # frames
+    STRIDE = 3            # analyze every 3rd frame
+    CUT_DIFF_MIN = 18.0   # floor for the adaptive scene-cut threshold
+    MIN_SHOT_SEC = 0.7    # merge cuts closer than this (fast montages)
+    MAX_DETECT = 8        # detection frames per shot
+    KEYFRAME_SEC = 2.0    # sub-segment length for long-shot keyframes
+    MAX_PAN_FRAC = 0.015  # max pan per frame, fraction of crop size
 
     def __init__(self, src, src_w, src_h, out_w, out_h, subject="face"):
         self.src_w, self.src_h = src_w, src_h
@@ -372,15 +386,12 @@ class _SubjectTracker:
         if src_r > target_r:
             self.crop_h = src_h
             self.crop_w = int(src_h * target_r)
-            self.pan_axis = "x"
         else:
             self.crop_w = src_w
             self.crop_h = int(src_w / target_r)
-            self.pan_axis = "y"
 
-        self.cx = src_w / 2
-        self.cy = src_h / 2
-        self.alpha = 0.08  # smoothing — lower = steadier camera
+        self._small_w = 320
+        self._small_h = max(int(320 * src_h / src_w), 1)
 
         self.detector = None
         if _MP_AVAILABLE:
@@ -390,37 +401,151 @@ class _SubjectTracker:
             except Exception:
                 self.detector = None
 
-        # Motion tracking for non-face subjects (car, ball, action):
-        # median of sampled frames ≈ static background, robust to slow movers
-        self._small_w = 320
-        self._small_h = max(int(320 * src_h / src_w), 1)
-        self.background = None
-        if self.subject == "object":
-            self.background = self._median_background(src)
+        self.plan = self._build_plan(src)  # (n_frames, 2) crop centers
 
-    def _median_background(self, src):
+        if self.detector is not None:
+            self.detector.close()
+            self.detector = None
+
+    # -- analysis pass -----------------------------------------------------
+
+    def _build_plan(self, src):
         cap = cv2.VideoCapture(src)
-        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total < 3:
-            cap.release()
-            return None
-        grays = []
-        for i in np.linspace(0, total - 1, min(20, total)).astype(int):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
-            ret, frame = cap.read()
-            if ret:
-                small = cv2.resize(frame, (self._small_w, self._small_h))
-                grays.append(cv2.cvtColor(small, cv2.COLOR_BGR2GRAY))
-        cap.release()
-        if len(grays) < 3:
-            return None
-        return np.median(np.stack(grays), axis=0).astype(np.uint8)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
 
-    def _detect_face(self, small):
+        samples = []  # (frame_idx, gray_small, bgr_small)
+        n_frames = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if n_frames % self.STRIDE == 0:
+                small = cv2.resize(frame, (self._small_w, self._small_h))
+                samples.append((n_frames, cv2.cvtColor(small, cv2.COLOR_BGR2GRAY), small))
+            n_frames += 1
+        cap.release()
+
+        center = np.array([self.src_w / 2, self.src_h / 2])
+        if n_frames == 0 or len(samples) < 2:
+            return np.tile(center, (max(n_frames, 1), 1))
+
+        shots = self._detect_shots(samples, fps)
+
+        plan = np.tile(center, (n_frames, 1))
+        for s_start, s_end in shots:  # sample indices, inclusive
+            shot_samples = samples[s_start:s_end + 1]
+            keyframes = self._shot_keyframes(shot_samples, fps)
+            f0 = shot_samples[0][0]
+            f1 = shot_samples[-1][0] + self.STRIDE - 1
+            f1 = min(f1, n_frames - 1)
+            if not keyframes:
+                continue  # stays center-framed
+            kf_frames = np.array([k[0] for k in keyframes], dtype=float)
+            kf_cx = np.array([k[1] for k in keyframes])
+            kf_cy = np.array([k[2] for k in keyframes])
+            frames = np.arange(f0, f1 + 1, dtype=float)
+            plan[f0:f1 + 1, 0] = np.interp(frames, kf_frames, kf_cx)
+            plan[f0:f1 + 1, 1] = np.interp(frames, kf_frames, kf_cy)
+            self._clamp_pan_speed(plan, f0, f1)
+
+        return plan
+
+    def _detect_shots(self, samples, fps):
+        # Color diff between consecutive samples catches chroma-only cuts
+        # that grayscale misses
+        diffs = np.array([
+            cv2.absdiff(samples[i][2], samples[i - 1][2]).mean()
+            for i in range(1, len(samples))
+        ])
+        if len(diffs) == 0:
+            return [(0, len(samples) - 1)]
+
+        # Adaptive threshold: a cut must stand well above the clip's own
+        # motion baseline, so constant fast motion (sports pans) doesn't
+        # register as cuts while real cuts still spike far above it
+        baseline = float(np.median(diffs))
+        threshold = max(self.CUT_DIFF_MIN, baseline * 3.5)
+
+        min_gap = int(self.MIN_SHOT_SEC * fps / self.STRIDE)
+        boundaries = [0]
+        for i in range(1, len(samples)):
+            if diffs[i - 1] > threshold and (i - boundaries[-1]) >= max(min_gap, 2):
+                boundaries.append(i)
+        boundaries.append(len(samples))
+        return [(boundaries[i], boundaries[i + 1] - 1)
+                for i in range(len(boundaries) - 1)]
+
+    def _shot_keyframes(self, shot_samples, fps):
+        """Detect the subject in a shot; return [(frame_idx, cx, cy), ...] or []."""
+        if len(shot_samples) < 2:
+            return []
+
+        k = min(self.MAX_DETECT, len(shot_samples))
+        picks = [shot_samples[i] for i in
+                 np.linspace(0, len(shot_samples) - 1, k).astype(int)]
+
+        detections = []  # (frame_idx, cx, cy)
+        face_hits = 0
+        for frame_idx, _, bgr in picks:
+            pos = self._detect_face(bgr)
+            if pos is not None:
+                face_hits += 1
+                detections.append((frame_idx, pos[0], pos[1]))
+
+        # Not a face shot — try the dominant moving object against this
+        # shot's own background (median of its frames, so cuts don't leak in).
+        # Also for subject "none": the user chose Focus explicitly, so try.
+        if face_hits < max(2, k // 2) and self.subject != "face":
+            detections = []
+            grays = [g for _, g, _ in shot_samples[:24]]
+            if len(grays) >= 3:
+                background = np.median(np.stack(grays), axis=0).astype(np.uint8)
+                for frame_idx, gray, _ in picks:
+                    pos = self._detect_moving_object(gray, background)
+                    if pos is not None:
+                        detections.append((frame_idx, pos[0], pos[1]))
+
+        # Too few reliable detections → keep the shot center-framed
+        if len(detections) < max(2, int(0.25 * k)):
+            return []
+
+        frames = np.array([d[0] for d in detections], dtype=float)
+        xs = np.array([d[1] for d in detections])
+        ys = np.array([d[2] for d in detections])
+
+        shot_sec = (frames[-1] - frames[0]) / fps
+        if shot_sec <= 4.0:
+            # Short shot: one locked center for the whole shot
+            return [(frames[0], float(np.median(xs)), float(np.median(ys)))]
+
+        # Long shot: a keyframe every ~KEYFRAME_SEC so a walking/drifting
+        # subject is followed slowly instead of chased
+        keyframes = []
+        chunk = self.KEYFRAME_SEC * fps
+        t = frames[0]
+        while t <= frames[-1]:
+            mask = (frames >= t) & (frames < t + chunk)
+            if mask.sum() >= 1:
+                keyframes.append((float(frames[mask].mean()),
+                                  float(np.median(xs[mask])),
+                                  float(np.median(ys[mask]))))
+            t += chunk
+        return keyframes or [(frames[0], float(np.median(xs)), float(np.median(ys)))]
+
+    def _clamp_pan_speed(self, plan, f0, f1):
+        max_dx = self.crop_w * self.MAX_PAN_FRAC
+        max_dy = self.crop_h * self.MAX_PAN_FRAC
+        for f in range(f0 + 1, f1 + 1):
+            plan[f, 0] = plan[f - 1, 0] + np.clip(plan[f, 0] - plan[f - 1, 0], -max_dx, max_dx)
+            plan[f, 1] = plan[f - 1, 1] + np.clip(plan[f, 1] - plan[f - 1, 1], -max_dy, max_dy)
+
+    # -- detectors -----------------------------------------------------------
+
+    def _detect_face(self, small_bgr):
         if self.detector is None:
             return None
         try:
-            result = self.detector.process(cv2.cvtColor(small, cv2.COLOR_BGR2RGB))
+            result = self.detector.process(cv2.cvtColor(small_bgr, cv2.COLOR_BGR2RGB))
         except Exception:
             return None
         if result and result.detections:
@@ -431,11 +556,8 @@ class _SubjectTracker:
                     (bbox.ymin + bbox.height / 2) * self.src_h)
         return None
 
-    def _detect_moving_object(self, small):
-        if self.background is None:
-            return None
-        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        diff = cv2.absdiff(gray, self.background)
+    def _detect_moving_object(self, gray, background):
+        diff = cv2.absdiff(gray, background)
         _, mask = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
         mask = cv2.morphologyEx(
             mask, cv2.MORPH_OPEN,
@@ -451,25 +573,13 @@ class _SubjectTracker:
         return ((bx + bw / 2) / self._small_w * self.src_w,
                 (by + bh / 2) / self._small_h * self.src_h)
 
+    # -- render pass ----------------------------------------------------------
+
     def crop(self, frame, frame_idx):
-        if frame_idx % self.DETECT_EVERY == 0:
-            small = cv2.resize(frame, (self._small_w, self._small_h))
-            target = self._detect_face(small)
-            if target is None and self.subject == "object":
-                target = self._detect_moving_object(small)
-            if target is not None:
-                tx, ty = target
-                self.cx += (tx - self.cx) * (self.alpha * self.DETECT_EVERY)
-                self.cy += (ty - self.cy) * (self.alpha * self.DETECT_EVERY)
-
-        if self.pan_axis == "x":
-            x0 = int(np.clip(self.cx - self.crop_w / 2, 0, self.src_w - self.crop_w))
-            y0 = 0
-        else:
-            x0 = 0
-            # Bias slightly above center so faces/heads stay in frame
-            y0 = int(np.clip(self.cy - self.crop_h * 0.45, 0, self.src_h - self.crop_h))
-
+        cx, cy = self.plan[min(frame_idx, len(self.plan) - 1)]
+        x0 = int(np.clip(cx - self.crop_w / 2, 0, self.src_w - self.crop_w))
+        # Bias slightly above center so faces/heads stay in frame
+        y0 = int(np.clip(cy - self.crop_h * 0.45, 0, self.src_h - self.crop_h))
         cropped = frame[y0:y0 + self.crop_h, x0:x0 + self.crop_w]
         return cv2.resize(cropped, (self.out_w, self.out_h), interpolation=cv2.INTER_AREA)
 

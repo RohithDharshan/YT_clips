@@ -77,24 +77,33 @@ def analyze_focus(video_path: str) -> dict:
 
     # Median frame ≈ static background; a moving subject stands out fully in
     # each frame no matter how slowly it moves (consecutive-frame diffs only
-    # catch its edges).
-    background = np.median(np.stack(grays), axis=0).astype(np.uint8)
+    # catch its edges). Backgrounds are built per *chunk* of neighboring
+    # samples so multi-shot videos (sports broadcasts) don't blend unrelated
+    # scenes into one meaningless background.
     area = grays[0].shape[0] * grays[0].shape[1]
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
-    valid_fracs = []
-    for g in grays:
-        diff = cv2.absdiff(g, background)
-        _, th = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
-        th = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel)
-        contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
+    CHUNK = 6
+    valid_hits = 0
+    tested = 0
+    for c0 in range(0, len(grays), CHUNK):
+        chunk = grays[c0:c0 + CHUNK]
+        if len(chunk) < 3:
             continue
-        frac = max(cv2.contourArea(c) for c in contours) / area
-        if OBJECT_MIN_FRAC <= frac <= OBJECT_MAX_FRAC:
-            valid_fracs.append(frac)
+        background = np.median(np.stack(chunk), axis=0).astype(np.uint8)
+        for g in chunk:
+            tested += 1
+            diff = cv2.absdiff(g, background)
+            _, th = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
+            th = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel)
+            contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                continue
+            frac = max(cv2.contourArea(c) for c in contours) / area
+            if OBJECT_MIN_FRAC <= frac <= OBJECT_MAX_FRAC:
+                valid_hits += 1
 
-    object_rate = len(valid_fracs) / len(grays)
+    object_rate = valid_hits / tested if tested else 0.0
 
     if face_rate >= FACE_RATE_THRESHOLD:
         subject = "face"

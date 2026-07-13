@@ -31,7 +31,7 @@ Open http://localhost:3000 in your browser. If port 8000 is busy, the API automa
    - Climax moments (wins, overtakes, goals, emotional peaks — heavily weighted)
    - Videos with no speech fall back to audio/motion-scored windows
 5. **Render** — Top-N segments are rendered in a single pass:
-   - **Framing**: `auto` (use the subject analysis), `fit` (Normal — full frame) or `fill` (Focus — smoothed crop tracking the face *or* the moving subject, whichever the analysis found)
+   - **Framing**: `auto` (use the subject analysis), `fit` (Normal — full frame) or `fill` (Focus — shot-aware reframing: scene cuts are detected, each shot gets a stable crop locked on the median face/subject position, with slow keyframed panning only in long shots — steady even on rapid footage like sports)
    - **Captions**: word-by-word highlight styles — `karaoke`, `bold`, `minimal`, or `none`
    - **Watermark**: toggleable, custom text
    - Per-clip thumbnail + virality score breakdown

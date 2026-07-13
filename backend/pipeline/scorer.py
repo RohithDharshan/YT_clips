@@ -88,6 +88,11 @@ def score_segments(video_path: str, audio_path: str, transcript: list) -> list:
             "hook_score": round(hook_s, 4),
         })
 
+    # Transcript existed but nothing scoreable survived (e.g. one hallucinated
+    # blip on a silent track) — fall back to audio/motion windows
+    if not scored:
+        return _fallback_segments(video_path, audio_path)
+
     return sorted(scored, key=lambda x: x["score"], reverse=True)
 
 
