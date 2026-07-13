@@ -363,11 +363,17 @@ class _SubjectTracker:
          moving-object detections inside that shot. Long shots with a
          drifting subject get a few keyframes and pan slowly between them.
       3. Shots with no reliable subject stay center-framed.
+      4. If the action is WIDER than the crop window — two cars side by
+         side, a full-width on-screen graphic — cropping would cut it off,
+         so that shot is rendered full-frame (letterboxed) instead.
 
     The crop is locked within a shot, jumps instantly at cuts, and pan
     speed is clamped — the result is steady and watchable even when the
     source is rapid and chaotic.
     """
+
+    MODE_FILL = 0.0  # crop on the subject
+    MODE_FIT = 1.0   # subject/action too wide to crop — letterbox this shot
 
     STRIDE = 3            # analyze every 3rd frame
     CUT_DIFF_MIN = 18.0   # floor for the adaptive scene-cut threshold
@@ -425,21 +431,22 @@ class _SubjectTracker:
             n_frames += 1
         cap.release()
 
-        center = np.array([self.src_w / 2, self.src_h / 2])
+        default = np.array([self.src_w / 2, self.src_h / 2, self.MODE_FILL])
         if n_frames == 0 or len(samples) < 2:
-            return np.tile(center, (max(n_frames, 1), 1))
+            return np.tile(default, (max(n_frames, 1), 1))
 
         shots = self._detect_shots(samples, fps)
 
-        plan = np.tile(center, (n_frames, 1))
+        plan = np.tile(default, (n_frames, 1))
         for s_start, s_end in shots:  # sample indices, inclusive
             shot_samples = samples[s_start:s_end + 1]
-            keyframes = self._shot_keyframes(shot_samples, fps)
+            keyframes, mode = self._analyze_shot(shot_samples, fps)
             f0 = shot_samples[0][0]
             f1 = shot_samples[-1][0] + self.STRIDE - 1
             f1 = min(f1, n_frames - 1)
-            if not keyframes:
-                continue  # stays center-framed
+            plan[f0:f1 + 1, 2] = mode
+            if mode == self.MODE_FIT or not keyframes:
+                continue  # letterboxed or center-framed
             kf_frames = np.array([k[0] for k in keyframes], dtype=float)
             kf_cx = np.array([k[1] for k in keyframes])
             kf_cy = np.array([k[2] for k in keyframes])
@@ -475,48 +482,65 @@ class _SubjectTracker:
         return [(boundaries[i], boundaries[i + 1] - 1)
                 for i in range(len(boundaries) - 1)]
 
-    def _shot_keyframes(self, shot_samples, fps):
-        """Detect the subject in a shot; return [(frame_idx, cx, cy), ...] or []."""
+    def _analyze_shot(self, shot_samples, fps):
+        """Detect the subject in a shot.
+
+        Returns (keyframes, mode): keyframes is [(frame_idx, cx, cy), ...]
+        (empty → center-framed), mode is MODE_FILL or MODE_FIT. FIT means the
+        action is too wide to crop — e.g. two cars side by side or a
+        full-width on-screen graphic — so the shot must stay full-frame.
+        """
         if len(shot_samples) < 2:
-            return []
+            return [], self.MODE_FILL
 
         k = min(self.MAX_DETECT, len(shot_samples))
         picks = [shot_samples[i] for i in
                  np.linspace(0, len(shot_samples) - 1, k).astype(int)]
 
-        detections = []  # (frame_idx, cx, cy)
+        detections = []  # (frame_idx, cx, cy, width)
         face_hits = 0
         for frame_idx, _, bgr in picks:
             pos = self._detect_face(bgr)
             if pos is not None:
                 face_hits += 1
-                detections.append((frame_idx, pos[0], pos[1]))
+                detections.append((frame_idx, pos[0], pos[1], pos[2]))
 
-        # Not a face shot — try the dominant moving object against this
-        # shot's own background (median of its frames, so cuts don't leak in).
-        # Also for subject "none": the user chose Focus explicitly, so try.
+        # Not a face shot — measure the union of ALL moving objects against
+        # this shot's own background (median of its frames, so cuts don't
+        # leak in). Union, not just the largest blob: two cars racing side
+        # by side are ONE piece of action and must be framed together.
         if face_hits < max(2, k // 2) and self.subject != "face":
             detections = []
             grays = [g for _, g, _ in shot_samples[:24]]
             if len(grays) >= 3:
                 background = np.median(np.stack(grays), axis=0).astype(np.uint8)
                 for frame_idx, gray, _ in picks:
-                    pos = self._detect_moving_object(gray, background)
-                    if pos is not None:
-                        detections.append((frame_idx, pos[0], pos[1]))
+                    box = self._detect_moving_union(gray, background)
+                    if box is not None:
+                        x0, y0, x1, y1 = box
+                        detections.append((frame_idx, (x0 + x1) / 2,
+                                           (y0 + y1) / 2, x1 - x0))
 
         # Too few reliable detections → keep the shot center-framed
         if len(detections) < max(2, int(0.25 * k)):
-            return []
+            return [], self.MODE_FILL
 
         frames = np.array([d[0] for d in detections], dtype=float)
         xs = np.array([d[1] for d in detections])
         ys = np.array([d[2] for d in detections])
+        widths = np.array([d[3] for d in detections])
+
+        # Would cropping cut the action off? Needed width = the subject's
+        # own width plus how much its center moves around the locked frame.
+        subject_w = float(np.median(widths))
+        wander = float(np.percentile(xs, 85) - np.percentile(xs, 15))
+        if subject_w + 0.35 * wander > 0.92 * self.crop_w:
+            return [], self.MODE_FIT
 
         shot_sec = (frames[-1] - frames[0]) / fps
         if shot_sec <= 4.0:
             # Short shot: one locked center for the whole shot
-            return [(frames[0], float(np.median(xs)), float(np.median(ys)))]
+            return [(frames[0], float(np.median(xs)), float(np.median(ys)))], self.MODE_FILL
 
         # Long shot: a keyframe every ~KEYFRAME_SEC so a walking/drifting
         # subject is followed slowly instead of chased
@@ -530,7 +554,9 @@ class _SubjectTracker:
                                   float(np.median(xs[mask])),
                                   float(np.median(ys[mask]))))
             t += chunk
-        return keyframes or [(frames[0], float(np.median(xs)), float(np.median(ys)))]
+        if not keyframes:
+            keyframes = [(frames[0], float(np.median(xs)), float(np.median(ys)))]
+        return keyframes, self.MODE_FILL
 
     def _clamp_pan_speed(self, plan, f0, f1):
         max_dx = self.crop_w * self.MAX_PAN_FRAC
@@ -553,30 +579,43 @@ class _SubjectTracker:
                       key=lambda d: d.location_data.relative_bounding_box.width)
             bbox = det.location_data.relative_bounding_box
             return ((bbox.xmin + bbox.width / 2) * self.src_w,
-                    (bbox.ymin + bbox.height / 2) * self.src_h)
+                    (bbox.ymin + bbox.height / 2) * self.src_h,
+                    bbox.width * self.src_w)
         return None
 
-    def _detect_moving_object(self, gray, background):
+    def _detect_moving_union(self, gray, background):
+        """Union bounding box of all significant moving objects, src coords."""
         diff = cv2.absdiff(gray, background)
         _, mask = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
         mask = cv2.morphologyEx(
             mask, cv2.MORPH_OPEN,
             cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+
+        area = self._small_w * self._small_h
+        if cv2.countNonZero(mask) > area * 0.6:
+            return None  # whole-scene change, not objects
+
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
+        boxes = [cv2.boundingRect(c) for c in contours
+                 if 0.002 * area <= cv2.contourArea(c) <= 0.5 * area]
+        if not boxes:
             return None
-        largest = max(contours, key=cv2.contourArea)
-        area_frac = cv2.contourArea(largest) / (self._small_w * self._small_h)
-        if not 0.004 <= area_frac <= 0.5:
-            return None  # too small to be the subject, or a whole-scene change
-        bx, by, bw, bh = cv2.boundingRect(largest)
-        return ((bx + bw / 2) / self._small_w * self.src_w,
-                (by + bh / 2) / self._small_h * self.src_h)
+
+        x0 = min(b[0] for b in boxes)
+        y0 = min(b[1] for b in boxes)
+        x1 = max(b[0] + b[2] for b in boxes)
+        y1 = max(b[1] + b[3] for b in boxes)
+        sx = self.src_w / self._small_w
+        sy = self.src_h / self._small_h
+        return (x0 * sx, y0 * sy, x1 * sx, y1 * sy)
 
     # -- render pass ----------------------------------------------------------
 
     def crop(self, frame, frame_idx):
-        cx, cy = self.plan[min(frame_idx, len(self.plan) - 1)]
+        cx, cy, mode = self.plan[min(frame_idx, len(self.plan) - 1)]
+        if mode == self.MODE_FIT:
+            # Action wider than the crop window — show the full frame
+            return _fit_pad(frame, self.src_w, self.src_h, self.out_w, self.out_h)
         x0 = int(np.clip(cx - self.crop_w / 2, 0, self.src_w - self.crop_w))
         # Bias slightly above center so faces/heads stay in frame
         y0 = int(np.clip(cy - self.crop_h * 0.45, 0, self.src_h - self.crop_h))
