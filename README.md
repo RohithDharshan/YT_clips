@@ -1,6 +1,12 @@
-# Project Ray — AI Clip Studio
+# ClipMind — Think Less. Create More.
 
-An AI-powered short-form clip studio. Paste a YouTube URL or upload a video, and get ranked, reframed, captioned clips — then fine-tune each one in a built-in editor before you post.
+An AI-powered short-form clip studio by **ROJIT ENTERPRISES PVT LTD**. Paste a YouTube URL or upload a video, and get ranked, reframed, captioned clips — then fine-tune each one in a built-in editor before you post.
+
+## Pages
+
+- **`index.html`** — landing page: cinematic logo intro (the ClipMind logo alone, then a scroll-driven zoom dive that dissolves into the home page), hero, features, how-it-works, CTA
+- **`login.html` / `signup.html`** — email + password auth (validated forms, password strength meter)
+- **`studio.html`** — the full clip editor, gated behind login
 
 ## Quick Start
 
@@ -65,15 +71,21 @@ After processing you land in a full editor:
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/process/youtube` | Submit YouTube URL |
-| POST | `/api/process/upload` | Upload video file (multipart form) |
-| POST | `/api/regenerate` | Regenerate all clips with new settings (uses cache) |
-| POST | `/api/clip/rerender` | Re-render one clip with new trim/style |
+| POST | `/api/auth/signup` | Create account (name, email, password ≥ 8 chars) |
+| POST | `/api/auth/login` | Log in → session token (30-day expiry) |
+| POST | `/api/auth/logout` | Invalidate the session token |
+| GET | `/api/auth/me` | Current user (Bearer token) |
+| POST | `/api/process/youtube` | Submit YouTube URL 🔒 |
+| POST | `/api/process/upload` | Upload video file (multipart form) 🔒 |
+| POST | `/api/regenerate` | Regenerate all clips with new settings (uses cache) 🔒 |
+| POST | `/api/clip/rerender` | Re-render one clip with new trim/style 🔒 |
 | GET | `/api/status/{job_id}` | Poll job status, progress detail + results |
 | GET | `/api/transcript/{job_id}` | Full transcript + scored segments |
 | GET | `/api/jobs` | Recent projects |
 | GET | `/api/download/{job_id}.zip` | All clips as a ZIP |
-| DELETE | `/api/job/{job_id}` | Delete a job and its clips |
+| DELETE | `/api/job/{job_id}` | Delete a job and its clips 🔒 |
+
+🔒 = requires `Authorization: Bearer <token>`. Passwords are stored as PBKDF2-HMAC-SHA256 (200k iterations, per-user salt) in SQLite.
 
 ## Requirements
 

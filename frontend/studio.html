@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipMind Studio</title>
+  <style>
+    :root {
+      --bg: #08080d;
+      --surface: #0f0f16;
+      --surface2: #14141f;
+      --border: #1f1f30;
+      --border-hi: #2c2c44;
+      --accent: #7c5cfc;
+      --accent-soft: rgba(124,92,252,0.14);
+      --accent2: #fc5caa;
+      --text: #eceaf6;
+      --muted: #7a7a96;
+      --success: #3dd68c;
+      --warn: #fcb25c;
+      --danger: #fc5c5c;
+      --radius: 12px;
+      --mono: "SF Mono", ui-monospace, Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* ---------- shared ---------- */
+    .btn {
+      padding: 11px 22px;
+      border-radius: 9px;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .18s;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #6a4de0; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: .4; pointer-events: none; }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border-hi); }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost { background: transparent; color: var(--muted); border: none; }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-sm { padding: 7px 14px; font-size: 12.5px; }
+
+    .pill {
+      padding: 8px 16px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .18s;
+      user-select: none;
+    }
+    .pill:hover { border-color: var(--accent); color: var(--text); }
+    .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+    .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- header ---------- */
+    header {
+      height: 58px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo {
+      font-size: 19px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -.5px;
+      cursor: pointer;
+    }
+    .header-sub { color: var(--muted); font-size: 12px; }
+    .header-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ---------- setup view ---------- */
+    #view-setup { max-width: 960px; margin: 0 auto; padding: 44px 24px 80px; }
+
+    .hero { text-align: center; margin-bottom: 40px; }
+    .hero h1 {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 30%, var(--accent) 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p { color: var(--muted); margin-top: 10px; font-size: 15px; }
+
+    .card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 26px;
+      margin-bottom: 22px;
+    }
+    .card h2 {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 18px;
+    }
+
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"], input[type="number"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      padding: 12px 16px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type="text"] { flex: 1; }
+    input:focus { border-color: var(--accent); }
+    input[type="number"] { width: 84px; }
+
+    .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12.5px; margin: 22px 0; }
+    .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+
+    .upload-zone {
+      border: 2px dashed var(--border-hi);
+      border-radius: var(--radius);
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: var(--accent-soft); }
+    .upload-zone input { display: none; }
+    .upload-zone .icon { font-size: 30px; margin-bottom: 6px; }
+    .upload-zone p { color: var(--muted); font-size: 13px; }
+    .upload-zone .filename { color: var(--accent); font-size: 14px; margin-top: 8px; font-weight: 600; }
+
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+    .control-block > label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+    .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .custom-row { display: none; align-items: center; gap: 8px; margin-top: 10px; }
+    .custom-row.show { display: flex; }
+    .custom-row span { color: var(--muted); font-size: 13px; }
+
+    .style-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .style-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      padding: 12px 8px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .18s;
+    }
+    .style-card:hover { border-color: var(--accent); }
+    .style-card.active { border-color: var(--accent); background: var(--accent-soft); }
+    .style-card .demo {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      background: #000;
+      overflow: hidden;
+      font-size: 11px;
+    }
+    .style-card .nm { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .style-card.active .nm { color: var(--text); }
+
+    .toggle-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    .switch { position: relative; width: 38px; height: 22px; cursor: pointer; flex-shrink: 0; }
+    .switch input { display: none; }
+    .switch .track {
+      position: absolute; inset: 0;
+      background: var(--border-hi);
+      border-radius: 100px;
+      transition: background .2s;
+    }
+    .switch .thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .switch input:checked + .track { background: var(--accent); }
+    .switch input:checked + .track + .thumb { transform: translateX(16px); }
+    .toggle-lbl { font-size: 13px; color: var(--text); font-weight: 500; }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color .18s;
+      font-size: 13px;
+    }
+    .recent-item:hover { border-color: var(--accent); }
+    .recent-item .src { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .recent-item .meta { color: var(--muted); font-size: 12px; }
+    .recent-item .badge {
+      font-size: 11px; padding: 3px 9px; border-radius: 100px; font-weight: 700;
+    }
+    .badge.done { background: rgba(61,214,140,.14); color: var(--success); }
+    .badge.error { background: rgba(252,92,92,.13); color: var(--danger); }
+
+    .error-msg {
+      background: rgba(252,92,92,.1);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 13px 17px;
+      font-size: 13.5px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* ---------- processing view ---------- */
+    #view-processing { max-width: 620px; margin: 0 auto; padding: 70px 24px; }
+    .steps { margin: 34px 0 26px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 15px 0;
+      opacity: .38;
+      transition: opacity .3s;
+    }
+    .step.active, .step.done { opacity: 1; }
+    .step .dot {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 2px solid var(--border-hi);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      background: var(--surface2);
+      transition: all .3s;
+    }
+    .step.active .dot { border-color: var(--accent); box-shadow: 0 0 18px rgba(124,92,252,.45); }
+    .step.done .dot { border-color: var(--success); background: rgba(61,214,140,.12); }
+    .step .titles .t { font-size: 14.5px; font-weight: 600; }
+    .step .titles .d { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+    .progress-bar-wrap { background: var(--surface2); border-radius: 100px; height: 7px; overflow: hidden; }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 100px;
+      transition: width .5s;
+      width: 0%;
+    }
+    .progress-detail { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; min-height: 18px; }
+
+    /* ---------- editor view ---------- */
+    #view-editor {
+      height: calc(100vh - 58px);
+      display: none;
+      grid-template-columns: 270px 1fr 320px;
+      grid-template-rows: 1fr auto;
+    }
+    #view-editor.active { display: grid; }
+
+    .clip-rail {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 14px;
+      grid-column: 1;
+      grid-row: 1 / 3;
+      background: var(--surface);
+    }
+    .rail-title { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin: 4px 4px 12px; }
+    .clip-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color .18s;
+      background: var(--surface2);
+      position: relative;
+    }
+    .clip-item:hover { border-color: var(--border-hi); }
+    .clip-item.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .clip-item img { width: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; background: #000; }
+    .clip-item .no-thumb { width: 100%; aspect-ratio: 16/10; background: #000; display:flex; align-items:center; justify-content:center; color: var(--muted); font-size: 22px; }
+    .clip-item .ci-body { padding: 10px 12px; }
+    .clip-item .ci-title { font-size: 12.5px; font-weight: 600; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .clip-item .ci-meta { display: flex; gap: 8px; margin-top: 7px; font-size: 11px; color: var(--muted); }
+    .clip-item .rank-chip {
+      position: absolute; top: 8px; left: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 11px; font-weight: 800;
+      padding: 3px 9px; border-radius: 100px;
+    }
+    .clip-item .score-chip {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(4px);
+      color: var(--success); font-size: 11px; font-weight: 700;
+      padding: 3px 8px; border-radius: 100px;
+    }
+
+    .stage {
+      grid-column: 2;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .stage-player {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 22px;
+      min-height: 0;
+    }
+    .stage-player video {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 10px;
+      background: #000;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+
+    .trim-panel {
+      padding: 14px 24px 18px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .trim-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .trim-head .lbl { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .trim-times { font-family: var(--mono); font-size: 12px; color: var(--text); }
+    .trim-head .apply-wrap { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .dirty-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: none; }
+    .dirty-dot.show { display: block; }
+
+    .trim-strip {
+      position: relative;
+      height: 52px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      user-select: none;
+      touch-action: none;
+      overflow: hidden;
+    }
+    .trim-heat { position: absolute; inset: 0; }
+    .trim-sel {
+      position: absolute; top: 0; bottom: 0;
+      background: rgba(124,92,252,.22);
+      border-left: 3px solid var(--accent);
+      border-right: 3px solid var(--accent);
+      cursor: grab;
+    }
+    .trim-handle {
+      position: absolute; top: 0; bottom: 0;
+      width: 14px;
+      cursor: ew-resize;
+      z-index: 2;
+    }
+    .trim-handle::after {
+      content: "";
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px; height: 22px;
+      border-radius: 2px;
+      background: #fff;
+      opacity: .85;
+    }
+    .trim-playhead {
+      position: absolute; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent2);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .trim-scale { display: flex; justify-content: space-between; margin-top: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+
+    /* inspector */
+    .inspector {
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      overflow-y: auto;
+      grid-column: 3;
+      grid-row: 1 / 3;
+      display: flex;
+      flex-direction: column;
+    }
+    .tabs { display: flex; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 5; }
+    .tab {
+      flex: 1;
+      padding: 13px 0;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all .18s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+    .tab-pane { display: none; padding: 18px; }
+    .tab-pane.active { display: block; }
+
+    .insp-section { margin-bottom: 22px; }
+    .insp-section > label { display: block; font-size: 12px; color: var(--muted); font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .07em; }
+    .insp-title { font-size: 14px; font-weight: 700; line-height: 1.4; margin-bottom: 4px; }
+    .insp-caption { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+    .score-row { margin-bottom: 11px; }
+    .score-row .sr-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+    .score-row .sr-head .k { color: var(--muted); font-weight: 600; }
+    .score-row .sr-head .v { font-family: var(--mono); color: var(--text); }
+    .score-track { height: 5px; background: var(--bg); border-radius: 100px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s; }
+
+    .anchor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 18px);
+      grid-template-rows: repeat(3, 18px);
+      gap: 4px;
+    }
+    .anchor-cell {
+      background: var(--border-hi);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background .15s, transform .15s;
+    }
+    .anchor-cell:hover { background: var(--accent2); transform: scale(1.12); }
+    .anchor-cell.active { background: var(--accent); }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 10px;
+    }
+    .slider-row span { font-size: 11.5px; color: var(--muted); width: 42px; }
+    .slider-row b { font-size: 11.5px; font-family: var(--mono); color: var(--text); width: 42px; text-align: right; font-weight: 600; }
+    .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+
+    .transcript-seg {
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background .15s;
+      margin-bottom: 2px;
+    }
+    .transcript-seg:hover { background: var(--surface2); }
+    .transcript-seg.in-range { color: var(--text); background: var(--accent-soft); }
+    .transcript-seg .ts { font-family: var(--mono); font-size: 10.5px; color: var(--accent); margin-right: 8px; }
+
+    /* timeline footer */
+    .timeline-footer {
+      grid-column: 2 / 3;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 12px 24px 16px;
+    }
+    .tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .tl-head .lbl { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .tl-head .dur { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    #heatmap { width: 100%; height: 56px; display: block; border-radius: 8px; background: var(--surface2); cursor: pointer; }
+
+    .toast {
+      position: fixed;
+      bottom: 26px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      padding: 12px 22px;
+      border-radius: 100px;
+      font-size: 13.5px;
+      font-weight: 600;
+      z-index: 200;
+      transition: transform .3s;
+      box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: var(--danger); color: var(--danger); }
+
+    @media (max-width: 1100px) {
+      #view-editor.active { grid-template-columns: 220px 1fr; }
+      .inspector { display: none; }
+    }
+    @media (max-width: 760px) {
+      #view-editor.active { grid-template-columns: 1fr; }
+      .clip-rail { display: none; }
+      .stage { grid-column: 1; }
+      .timeline-footer { grid-column: 1 / -1; }
+      .trim-head { flex-wrap: wrap; }
+      .settings-grid, .style-cards { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="logo" onclick="goHome()" style="display:flex;align-items:center;gap:9px;"><img src="assets/clipmind.png" alt="" style="width:26px;height:26px;object-fit:contain;" />ClipMind</div>
+    </div>
+    <div class="header-sub" id="header-sub">Studio</div>
+    <div class="header-right" id="editor-actions" style="display:none;">
+      <button class="btn btn-ghost btn-sm" onclick="goHome()">← New project</button>
+      <button class="btn btn-outline btn-sm" onclick="regenerateAll()">↺ Regenerate all</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadAll()">⬇ Download all (.zip)</button>
+    </div>
+    <div class="header-right" id="user-chip" style="display:none;">
+      <span id="user-name" style="font-size:12.5px;color:var(--muted);"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logoutUser()">Log out</button>
+    </div>
+  </header>
+
+  <!-- ================= SETUP ================= -->
+  <div class="view active" id="view-setup">
+    <div class="hero">
+      <h1>Turn long videos into viral clips</h1>
+      <p>AI finds the highlights, reframes them, burns in captions — you just post.</p>
+    </div>
+
+    <div class="card">
+      <h2>Source</h2>
+      <div class="input-row">
+        <input type="text" id="yt-url" placeholder="Paste a YouTube URL…" onkeydown="if(event.key==='Enter')submitYoutube()" />
+        <button class="btn btn-primary" onclick="submitYoutube()" id="yt-btn">Generate clips</button>
+      </div>
+      <div id="url-error" class="error-msg"></div>
+      <div class="divider">or upload a file</div>
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".mp4,.mov,.mkv,.webm" onchange="fileSelected(this)" />
+        <div class="icon">🎬</div>
+        <p>Drop a video or click to browse</p>
+        <p style="font-size:11.5px; margin-top:4px;">MP4 · MOV · MKV · WEBM</p>
+        <div class="filename" id="file-name"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Clip settings</h2>
+      <div class="settings-grid">
+        <div class="control-block">
+          <label>Duration</label>
+          <div class="pill-group" id="duration-group">
+            <div class="pill" data-val="<30s">&lt; 30s</div>
+            <div class="pill active" data-val="<1min">&lt; 1 min</div>
+            <div class="pill" data-val="custom">Custom</div>
+          </div>
+          <div class="custom-row" id="duration-custom">
+            <input type="number" id="dur-min" value="30" min="5" max="300" />
+            <span>–</span>
+            <input type="number" id="dur-max" value="90" min="10" max="600" />
+            <span>seconds</span>
+          </div>
+        </div>
+
+        <div class="control-block">
+          <label>Aspect ratio</label>
+          <div class="pill-group" id="ratio-group">
+            <div class="pill active" data-val="9:16">9:16</div>
+            <div class="pill" data-val="1:1">1:1</div>
+            <div class="pill" data-val="16:9">16:9</div>
+            <div class="pill" data-val="custom">Custom</div>
+          </div>
+          <div class="custom-row" id="ratio-custom">
+            <input type="number" id="ratio-w" value="9" min="1" max="100" />
+            <span>:</span>
+            <input type="number" id="ratio-h" value="16" min="1" max="100" />
+          </div>
+        </div>
+
+        <div class="control-block">
+          <label>Framing</label>
+          <div class="pill-group" id="framing-group">
+            <div class="pill active" data-val="auto" title="The video is analyzed first — AI picks Normal or Focus based on what it finds">✨ Auto</div>
+            <div class="pill" data-val="fit" title="Normal — full frame, letterboxed">Normal</div>
+            <div class="pill" data-val="fill" title="Crop in and track the subject (face, car, action)">Focus subject</div>
+            <div class="pill" data-val="manual" title="Set crop, zoom, position grid and rotation yourself per clip in the editor">Manual edit</div>
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;">Every video is analyzed first — Auto focuses on the face or the moving subject when one is found. Manual gives you crop, zoom, grid position &amp; rotation controls per clip in the editor.</div>
+        </div>
+
+        <div class="control-block">
+          <label>Number of clips</label>
+          <input type="number" id="num-clips" value="5" min="1" max="10" />
+        </div>
+      </div>
+
+      <div class="control-block" style="margin-top:24px;">
+        <label>Caption style</label>
+        <div class="style-cards" id="caption-group">
+          <div class="style-card active" data-val="karaoke">
+            <div class="demo"><span style="color:#fff;">SO&nbsp;</span><span style="color:#ffd60a;">THIS</span><span style="color:#fff;">&nbsp;IS</span></div>
+            <div class="nm">Karaoke</div>
+          </div>
+          <div class="style-card" data-val="bold">
+            <div class="demo" style="font-size:13px;-webkit-text-stroke:.5px #000;"><span style="color:#fff;">BIG&nbsp;</span><span style="color:#39ff88;">BOLD</span></div>
+            <div class="nm">Bold</div>
+          </div>
+          <div class="style-card" data-val="minimal">
+            <div class="demo"><span style="background:rgba(0,0,0,.8);border:1px solid #333;padding:2px 8px;border-radius:4px;color:#eee;font-weight:500;">subtle text</span></div>
+            <div class="nm">Minimal</div>
+          </div>
+          <div class="style-card" data-val="none">
+            <div class="demo" style="color:#555;">—</div>
+            <div class="nm">No captions</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label class="switch">
+          <input type="checkbox" id="wm-toggle" checked onchange="document.getElementById('wm-text').style.display=this.checked?'block':'none'" />
+          <span class="track"></span><span class="thumb"></span>
+        </label>
+        <span class="toggle-lbl">Watermark</span>
+        <input type="text" id="wm-text" value="ClipMind" style="max-width:200px;padding:8px 12px;font-size:13px;" />
+      </div>
+    </div>
+
+    <div class="card" id="recent-card" style="display:none;">
+      <h2>Recent projects</h2>
+      <div id="recent-list"></div>
+    </div>
+  </div>
+
+  <!-- ================= PROCESSING ================= -->
+  <div class="view" id="view-processing">
+    <div class="hero">
+      <h1 style="font-size:26px;">Working on it…</h1>
+      <p id="proc-source"></p>
+    </div>
+    <div class="steps" id="steps">
+      <div class="step" data-step="download"><div class="dot">⬇</div><div class="titles"><div class="t">Download</div><div class="d">Fetching the source video</div></div></div>
+      <div class="step" data-step="transcribe"><div class="dot">🎙</div><div class="titles"><div class="t">Transcribe</div><div class="d">Whisper word-level timestamps</div></div></div>
+      <div class="step" data-step="analyze"><div class="dot">🧠</div><div class="titles"><div class="t">Analyze</div><div class="d">Finding what to focus on, then scoring hooks, energy &amp; climax moments</div></div></div>
+      <div class="step" data-step="render"><div class="dot">🎬</div><div class="titles"><div class="t">Render</div><div class="d">Reframing, captions &amp; watermark</div></div></div>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="progress-detail" id="progress-detail">Starting…</div>
+    <div class="progress-detail" id="focus-note" style="color:var(--accent);font-weight:600;"></div>
+    <div id="proc-error" class="error-msg"></div>
+    <div style="text-align:center;margin-top:22px;"><button class="btn btn-ghost btn-sm" onclick="goHome()">Cancel &amp; go back</button></div>
+  </div>
+
+  <!-- ================= EDITOR ================= -->
+  <div class="view" id="view-editor">
+    <aside class="clip-rail">
+      <div class="rail-title">Clips</div>
+      <div id="clip-list"></div>
+    </aside>
+
+    <section class="stage">
+      <div class="stage-player">
+        <video id="player" controls playsinline></video>
+      </div>
+      <div class="trim-panel">
+        <div class="trim-head">
+          <span class="lbl">Trim</span>
+          <span class="trim-times" id="trim-times">00:00 → 00:00</span>
+          <div class="apply-wrap">
+            <div class="dirty-dot" id="dirty-dot" title="Unsaved changes"></div>
+            <button class="btn btn-outline btn-sm" onclick="resetTrim()">Reset</button>
+            <button class="btn btn-primary btn-sm" id="apply-btn" onclick="applyRerender()">Apply &amp; re-render</button>
+          </div>
+        </div>
+        <div class="trim-strip" id="trim-strip">
+          <canvas class="trim-heat" id="trim-heat"></canvas>
+          <div class="trim-sel" id="trim-sel"></div>
+          <div class="trim-handle" id="handle-l"></div>
+          <div class="trim-handle" id="handle-r"></div>
+          <div class="trim-playhead" id="trim-playhead"></div>
+        </div>
+        <div class="trim-scale"><span id="scale-l">00:00</span><span id="scale-r">00:00</span></div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <div class="tabs">
+        <div class="tab active" data-tab="style" onclick="setTab('style')">Style</div>
+        <div class="tab" data-tab="transcript" onclick="setTab('transcript')">Transcript</div>
+        <div class="tab" data-tab="stats" onclick="setTab('stats')">Analytics</div>
+      </div>
+
+      <div class="tab-pane active" id="pane-style">
+        <div class="insp-section">
+          <label>Clip</label>
+          <div class="insp-title" id="insp-title">—</div>
+          <div class="insp-caption" id="insp-caption"></div>
+          <div style="margin-top:10px;"><button class="btn btn-outline btn-sm" onclick="copyCaption(this)">Copy caption</button></div>
+        </div>
+        <div class="insp-section">
+          <label>Caption style</label>
+          <div class="pill-group" id="ed-caption-group">
+            <div class="pill" data-val="karaoke">Karaoke</div>
+            <div class="pill" data-val="bold">Bold</div>
+            <div class="pill" data-val="minimal">Minimal</div>
+            <div class="pill" data-val="none">None</div>
+          </div>
+        </div>
+        <div class="insp-section">
+          <label>Framing</label>
+          <div class="pill-group" id="ed-framing-group">
+            <div class="pill" data-val="fit">Normal</div>
+            <div class="pill" data-val="fill">Focus subject</div>
+            <div class="pill" data-val="manual">Manual</div>
+          </div>
+          <div id="focus-note-ed" style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
+
+          <div id="manual-panel" style="display:none;margin-top:12px;">
+            <canvas id="crop-canvas" style="width:100%;border-radius:8px;background:#000;cursor:grab;touch-action:none;display:block;"></canvas>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">Drag the window to reposition · use the grid for quick placement</div>
+            <div style="display:flex;gap:14px;margin-top:12px;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Grid</div>
+                <div class="anchor-grid" id="anchor-grid"></div>
+              </div>
+              <div style="flex:1;">
+                <div class="slider-row">
+                  <span>Zoom</span>
+                  <input type="range" id="zoom-range" min="1" max="4" step="0.05" value="1" />
+                  <b id="zoom-val">1.0×</b>
+                </div>
+                <div class="slider-row">
+                  <span>Rotate</span>
+                  <input type="range" id="rotate-range" min="-45" max="45" step="1" value="0" />
+                  <b id="rotate-val">0°</b>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="insp-section">
+          <label>Aspect ratio</label>
+          <div class="pill-group" id="ed-ratio-group">
+            <div class="pill" data-val="9:16">9:16</div>
+            <div class="pill" data-val="1:1">1:1</div>
+            <div class="pill" data-val="16:9">16:9</div>
+          </div>
+        </div>
+        <div class="insp-section">
+          <label>Watermark</label>
+          <div class="toggle-row" style="margin-top:4px;">
+            <label class="switch">
+              <input type="checkbox" id="ed-wm-toggle" checked onchange="markDirty()" />
+              <span class="track"></span><span class="thumb"></span>
+            </label>
+            <input type="text" id="ed-wm-text" value="ClipMind" oninput="markDirty()" style="max-width:160px;padding:7px 11px;font-size:12.5px;" />
+          </div>
+        </div>
+        <div class="insp-section" style="border-top:1px solid var(--border);padding-top:16px;">
+          <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;" onclick="applyRerender()">Apply to this clip</button>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;text-align:center;">Style changes re-render only the selected clip.<br/>Use “Regenerate all” above to apply everywhere.</div>
+        </div>
+      </div>
+
+      <div class="tab-pane" id="pane-transcript">
+        <div id="transcript-list" style="font-size:12.5px;color:var(--muted);">Loading transcript…</div>
+      </div>
+
+      <div class="tab-pane" id="pane-stats">
+        <div class="insp-section">
+          <label>Virality score</label>
+          <div style="font-size:34px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;" id="stat-score">—</div>
+        </div>
+        <div class="insp-section">
+          <label>Breakdown</label>
+          <div id="stat-breakdown"></div>
+        </div>
+        <div class="insp-section">
+          <label>Timing</label>
+          <div style="font-family:var(--mono);font-size:12.5px;color:var(--text);line-height:1.9;" id="stat-timing"></div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="timeline-footer">
+      <div class="tl-head">
+        <span class="lbl">Source timeline · highlight heatmap</span>
+        <span class="dur" id="tl-duration"></span>
+      </div>
+      <canvas id="heatmap"></canvas>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // API base: explicit override, else probe common local ports for the Ray backend
+    let API = window.__API_URL__ || "http://localhost:8000";
+    async function initApi() {
+      if (window.__API_URL__) return;
+      const candidates = ["http://localhost:8000", "http://localhost:8010", "http://localhost:8001"];
+      for (const base of candidates) {
+        try {
+          const res = await fetch(base + "/", { signal: AbortSignal.timeout(1200) });
+          const data = await res.json();
+          if (data && String(data.status || "").includes("Project Ray")) { API = base; return; }
+        } catch { /* try next */ }
+      }
+    }
+
+    // ---------- auth ----------
+    const TOKEN = localStorage.getItem("cm_token");
+    function authHeaders(extra) {
+      return Object.assign({ "Authorization": "Bearer " + (TOKEN || "") }, extra || {});
+    }
+    async function requireLogin() {
+      if (!TOKEN) { window.location.href = "login.html"; return false; }
+      try {
+        const res = await fetch(`${API}/api/auth/me`, { headers: authHeaders() });
+        if (!res.ok) throw 0;
+        const me = await res.json();
+        document.getElementById("user-name").textContent = me.name;
+        document.getElementById("user-chip").style.display = "flex";
+        return true;
+      } catch {
+        localStorage.removeItem("cm_token");
+        window.location.href = "login.html";
+        return false;
+      }
+    }
+    async function logoutUser() {
+      try { await fetch(`${API}/api/auth/logout`, { method: "POST", headers: authHeaders() }); } catch {}
+      localStorage.removeItem("cm_token");
+      window.location.href = "index.html";
+    }
+
+    // ---------- state ----------
+    let currentJobId = null;
+    let pollTimer = null;
+    let selectedFile = null;
+    let clips = [];
+    let selectedIdx = 0;
+    let transcriptData = null;   // {transcript, segments, duration}
+    let sourceDuration = 0;
+    let trim = { start: 0, end: 0, winStart: 0, winEnd: 0 };
+    let dirty = false;
+    let rendering = false;
+    let jobSource = "";
+
+    let focusInfo = null;   // subject analysis: {subject, label, recommend, ...}
+
+    const setup = {
+      duration: "<1min",
+      ratio: "9:16",
+      framing: "auto",
+      caption: "karaoke",
+    };
+    const editorStyle = { caption: "karaoke", framing: "fit", ratio: "9:16" };
+
+    // ---------- pill groups ----------
+    function bindPills(groupId, cb) {
+      const group = document.getElementById(groupId);
+      group.querySelectorAll(".pill, .style-card").forEach(el => {
+        el.addEventListener("click", () => {
+          group.querySelectorAll(".pill, .style-card").forEach(p => p.classList.remove("active"));
+          el.classList.add("active");
+          cb(el.dataset.val);
+        });
+      });
+    }
+    function setActivePill(groupId, val) {
+      const group = document.getElementById(groupId);
+      group.querySelectorAll(".pill, .style-card").forEach(p =>
+        p.classList.toggle("active", p.dataset.val === val));
+    }
+
+    bindPills("duration-group", v => {
+      setup.duration = v;
+      document.getElementById("duration-custom").classList.toggle("show", v === "custom");
+    });
+    bindPills("ratio-group", v => {
+      setup.ratio = v;
+      document.getElementById("ratio-custom").classList.toggle("show", v === "custom");
+    });
+    bindPills("framing-group", v => setup.framing = v);
+    bindPills("caption-group", v => setup.caption = v);
+
+    bindPills("ed-caption-group", v => { editorStyle.caption = v; markDirty(); });
+    bindPills("ed-framing-group", v => { editorStyle.framing = v; markDirty(); setFramingUI(); });
+    bindPills("ed-ratio-group", v => { editorStyle.ratio = v; markDirty(); drawCropCanvas(); });
+
+    // ---------- manual framing (crop / zoom / grid / rotate) ----------
+    const manual = { crop_x: 0.5, crop_y: 0.5, zoom: 1, rotate: 0 };
+    let cropImg = null;       // source frame for the crop editor
+    let cropImgJob = null;    // which job+clip the frame belongs to
+
+    function setFramingUI() {
+      const on = editorStyle.framing === "manual";
+      document.getElementById("manual-panel").style.display = on ? "block" : "none";
+      if (on) loadCropFrame();
+    }
+
+    function loadCropFrame() {
+      const key = currentJobId + ":" + selectedIdx;
+      if (cropImg && cropImgJob === key) { drawCropCanvas(); return; }
+      const mid = ((trim.start + trim.end) / 2).toFixed(1);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { cropImg = img; cropImgJob = key; drawCropCanvas(); };
+      img.onerror = () => { cropImg = null; drawCropCanvas(); };
+      img.src = `${API}/api/frame/${currentJobId}?t=${mid}`;
+    }
+
+    function cropRatio() {
+      const [rw, rh] = (editorStyle.ratio || "9:16").split(":").map(Number);
+      return (rw && rh) ? rw / rh : 9 / 16;
+    }
+
+    function cropRect(imgW, imgH) {
+      // largest window of target ratio, shrunk by zoom, centered on crop_x/y
+      const r = cropRatio();
+      let baseW, baseH;
+      if (imgW / imgH > r) { baseH = imgH; baseW = imgH * r; }
+      else { baseW = imgW; baseH = imgW / r; }
+      const w = baseW / manual.zoom, h = baseH / manual.zoom;
+      const cx = clamp(manual.crop_x * imgW, w / 2, imgW - w / 2);
+      const cy = clamp(manual.crop_y * imgH, h / 2, imgH - h / 2);
+      return { x: cx - w / 2, y: cy - h / 2, w, h };
+    }
+
+    function drawCropCanvas() {
+      const canvas = document.getElementById("crop-canvas");
+      if (!canvas || document.getElementById("manual-panel").style.display === "none") return;
+      const cssW = canvas.clientWidth || 280;
+      const aspect = cropImg ? cropImg.height / cropImg.width : 9 / 16;
+      const cssH = Math.min(cssW * aspect, 240);
+      canvas.style.height = cssH + "px";
+      const dpr = devicePixelRatio || 1;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const rect = cropRect(W, H);
+
+      // source frame, rotated around the window center like the render will be
+      if (cropImg) {
+        ctx.save();
+        if (manual.rotate) {
+          const cx = rect.x + rect.w / 2, cy = rect.y + rect.h / 2;
+          ctx.translate(cx, cy);
+          ctx.rotate(-manual.rotate * Math.PI / 180);
+          ctx.translate(-cx, -cy);
+        }
+        ctx.drawImage(cropImg, 0, 0, W, H);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#666";
+        ctx.font = `${12 * dpr}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("Source frame unavailable", W / 2, H / 2);
+      }
+
+      // dim everything outside the crop window
+      ctx.fillStyle = "rgba(0,0,0,.62)";
+      ctx.fillRect(0, 0, W, rect.y);
+      ctx.fillRect(0, rect.y + rect.h, W, H - rect.y - rect.h);
+      ctx.fillRect(0, rect.y, rect.x, rect.h);
+      ctx.fillRect(rect.x + rect.w, rect.y, W - rect.x - rect.w, rect.h);
+
+      // window border + rule-of-thirds grid
+      ctx.strokeStyle = "#7c5cfc";
+      ctx.lineWidth = 2 * dpr;
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = dpr;
+      for (let i = 1; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(rect.x + rect.w * i / 3, rect.y);
+        ctx.lineTo(rect.x + rect.w * i / 3, rect.y + rect.h);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(rect.x, rect.y + rect.h * i / 3);
+        ctx.lineTo(rect.x + rect.w, rect.y + rect.h * i / 3);
+        ctx.stroke();
+      }
+    }
+
+    // drag the crop window
+    (() => {
+      const canvas = document.getElementById("crop-canvas");
+      let dragging = null;
+      canvas.addEventListener("pointerdown", e => {
+        dragging = { x: e.clientX, y: e.clientY, ox: manual.crop_x, oy: manual.crop_y };
+        canvas.setPointerCapture(e.pointerId);
+        canvas.style.cursor = "grabbing";
+      });
+      canvas.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        manual.crop_x = clamp(dragging.ox + (e.clientX - dragging.x) / canvas.clientWidth, 0, 1);
+        manual.crop_y = clamp(dragging.oy + (e.clientY - dragging.y) / canvas.clientHeight, 0, 1);
+        syncAnchorGrid();
+        markDirty();
+        drawCropCanvas();
+      });
+      const stop = () => { dragging = null; canvas.style.cursor = "grab"; };
+      canvas.addEventListener("pointerup", stop);
+      canvas.addEventListener("pointercancel", stop);
+    })();
+
+    // 3x3 anchor grid for quick placement
+    const ANCHOR_VALS = [0.17, 0.5, 0.83];
+    (() => {
+      const grid = document.getElementById("anchor-grid");
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const cell = document.createElement("div");
+          cell.className = "anchor-cell";
+          cell.title = ["Top", "Middle", "Bottom"][row] + " " + ["left", "center", "right"][col];
+          cell.dataset.x = ANCHOR_VALS[col];
+          cell.dataset.y = ANCHOR_VALS[row];
+          cell.onclick = () => {
+            manual.crop_x = parseFloat(cell.dataset.x);
+            manual.crop_y = parseFloat(cell.dataset.y);
+            syncAnchorGrid();
+            markDirty();
+            drawCropCanvas();
+          };
+          grid.appendChild(cell);
+        }
+      }
+    })();
+
+    function syncAnchorGrid() {
+      document.querySelectorAll(".anchor-cell").forEach(c => {
+        c.classList.toggle("active",
+          Math.abs(parseFloat(c.dataset.x) - manual.crop_x) < 0.08 &&
+          Math.abs(parseFloat(c.dataset.y) - manual.crop_y) < 0.08);
+      });
+    }
+
+    document.getElementById("zoom-range").addEventListener("input", e => {
+      manual.zoom = parseFloat(e.target.value);
+      document.getElementById("zoom-val").textContent = manual.zoom.toFixed(2).replace(/0$/, "") + "×";
+      markDirty();
+      drawCropCanvas();
+    });
+    document.getElementById("rotate-range").addEventListener("input", e => {
+      manual.rotate = parseInt(e.target.value);
+      document.getElementById("rotate-val").textContent = manual.rotate + "°";
+      markDirty();
+      drawCropCanvas();
+    });
+
+    function syncManualControls() {
+      document.getElementById("zoom-range").value = manual.zoom;
+      document.getElementById("zoom-val").textContent = manual.zoom.toFixed(2).replace(/0$/, "") + "×";
+      document.getElementById("rotate-range").value = manual.rotate;
+      document.getElementById("rotate-val").textContent = manual.rotate + "°";
+      syncAnchorGrid();
+    }
+
+    // ---------- views ----------
+    function showView(name) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById("view-" + name).classList.add("active");
+      document.getElementById("editor-actions").style.display = name === "editor" ? "flex" : "none";
+      document.getElementById("header-sub").textContent =
+        name === "editor" ? (jobSource || "ClipMind Studio") : "ClipMind Studio";
+    }
+
+    function goHome() {
+      if (pollTimer) clearInterval(pollTimer);
+      const player = document.getElementById("player");
+      player.pause();
+      showView("setup");
+      loadRecent();
+    }
+
+    // ---------- setup: submit ----------
+    function buildParams() {
+      return {
+        duration_preset: setup.duration,
+        duration_min: setup.duration === "custom" ? parseInt(document.getElementById("dur-min").value) : null,
+        duration_max: setup.duration === "custom" ? parseInt(document.getElementById("dur-max").value) : null,
+        aspect_ratio: setup.ratio,
+        ratio_w: setup.ratio === "custom" ? parseInt(document.getElementById("ratio-w").value) : null,
+        ratio_h: setup.ratio === "custom" ? parseInt(document.getElementById("ratio-h").value) : null,
+        num_clips: parseInt(document.getElementById("num-clips").value),
+        framing: setup.framing,
+        caption_style: setup.caption,
+        watermark: document.getElementById("wm-toggle").checked,
+        watermark_text: document.getElementById("wm-text").value || null,
+      };
+    }
+
+    async function submitYoutube() {
+      const url = document.getElementById("yt-url").value.trim();
+      if (!url) return showError("url-error", "Please enter a YouTube URL.");
+      hideError("url-error");
+      jobSource = url;
+      try {
+        const res = await fetch(`${API}/api/process/youtube`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ url, ...buildParams() }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        startPolling(data.job_id);
+      } catch (e) {
+        showError("url-error", "Could not reach the API. Is the backend running on port 8000?");
+      }
+    }
+
+    function fileSelected(input) {
+      selectedFile = input.files[0];
+      document.getElementById("file-name").textContent = selectedFile ? selectedFile.name : "";
+      if (selectedFile) submitUpload();
+    }
+
+    const dz = document.getElementById("drop-zone");
+    dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+    dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+    dz.addEventListener("drop", e => {
+      e.preventDefault();
+      dz.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f) {
+        selectedFile = f;
+        document.getElementById("file-name").textContent = f.name;
+        submitUpload();
+      }
+    });
+
+    async function submitUpload() {
+      if (!selectedFile) return;
+      jobSource = selectedFile.name;
+      const fd = new FormData();
+      fd.append("file", selectedFile);
+      Object.entries(buildParams()).forEach(([k, v]) => { if (v !== null) fd.append(k, v); });
+      try {
+        const res = await fetch(`${API}/api/process/upload`, { method: "POST", headers: authHeaders(), body: fd });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        startPolling(data.job_id);
+      } catch (e) {
+        showError("url-error", "Upload failed. Is the backend running?");
+      }
+    }
+
+    async function regenerateAll() {
+      if (!currentJobId || rendering) return;
+      const params = buildParams();
+      params.caption_style = editorStyle.caption;
+      params.framing = editorStyle.framing;
+      params.aspect_ratio = editorStyle.ratio;
+      params.watermark = document.getElementById("ed-wm-toggle").checked;
+      params.watermark_text = document.getElementById("ed-wm-text").value || null;
+      const res = await fetch(`${API}/api/regenerate`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ job_id: currentJobId, ...params }),
+      });
+      if (!res.ok) return toast("Cache expired — reprocess the source", true);
+      startPolling(currentJobId);
+    }
+
+    // ---------- processing / polling ----------
+    const STEP_ORDER = ["download", "transcribe", "analyze", "render"];
+    const STATUS_STEP = {
+      queued: -1, downloading: 0, transcribing: 1, analyzing: 2,
+      generating: 3, regenerating: 3,
+    };
+
+    function startPolling(jobId) {
+      currentJobId = jobId;
+      if (pollTimer) clearInterval(pollTimer);
+      document.getElementById("proc-source").textContent = jobSource;
+      document.getElementById("proc-error").style.display = "none";
+      document.getElementById("focus-note").textContent = "";
+      showView("processing");
+      pollTimer = setInterval(() => pollStatus(jobId), 1200);
+      pollStatus(jobId);
+    }
+
+    async function pollStatus(jobId) {
+      let data;
+      try {
+        const res = await fetch(`${API}/api/status/${jobId}`);
+        data = await res.json();
+      } catch { return; }
+
+      document.getElementById("progress-bar").style.width = (data.progress || 0) + "%";
+      document.getElementById("progress-detail").textContent = data.detail || data.status || "";
+      if (data.focus) {
+        focusInfo = data.focus;
+        document.getElementById("focus-note").textContent = "🎯 " + data.focus.label;
+      }
+
+      const stepIdx = STATUS_STEP[data.status] ?? -1;
+      document.querySelectorAll("#steps .step").forEach((el, i) => {
+        el.classList.toggle("done", i < stepIdx || data.status === "done");
+        el.classList.toggle("active", i === stepIdx);
+        el.querySelector(".dot").textContent = (i < stepIdx || data.status === "done") ? "✓" : el.querySelector(".dot").dataset.icon || el.querySelector(".dot").textContent;
+      });
+
+      if (data.status === "done") {
+        clearInterval(pollTimer);
+        clips = data.clips || [];
+        jobSource = data.source || jobSource;
+        if (data.settings) {
+          editorStyle.caption = data.settings.caption_style || "karaoke";
+          editorStyle.framing = data.settings.framing || "fit";
+          editorStyle.ratio = data.settings.aspect_ratio || "9:16";
+        }
+        await loadTranscript(jobId);
+        enterEditor();
+      } else if (data.status === "error") {
+        clearInterval(pollTimer);
+        const el = document.getElementById("proc-error");
+        el.textContent = friendlyError(data.error || "Unknown error");
+        el.style.display = "block";
+      }
+    }
+
+    function friendlyError(raw) {
+      if (/Sign In|sign in|login/i.test(raw)) return "This video requires YouTube sign-in. Try a public video, or log into YouTube in Chrome on this Mac.";
+      if (/Private video/i.test(raw)) return "This video is private and cannot be downloaded.";
+      if (/age/i.test(raw)) return "This video is age-restricted — try a public video.";
+      if (/not found|404/i.test(raw)) return "Video not found. Check the URL.";
+      return raw;
+    }
+
+    async function loadTranscript(jobId) {
+      try {
+        const res = await fetch(`${API}/api/transcript/${jobId}`);
+        transcriptData = res.ok ? await res.json() : null;
+      } catch { transcriptData = null; }
+      if (transcriptData && transcriptData.focus) focusInfo = transcriptData.focus;
+      if (transcriptData) {
+        const segs = transcriptData.segments || [];
+        const trans = transcriptData.transcript || [];
+        sourceDuration = Math.max(
+          ...segs.map(s => s.end), ...trans.map(s => s.end),
+          ...clips.map(c => c.end), 0);
+      } else {
+        sourceDuration = Math.max(...clips.map(c => c.end), 0);
+      }
+    }
+
+    // ---------- editor ----------
+    function enterEditor() {
+      if (!clips.length) { toast("No clips could be generated from this video", true); goHome(); return; }
+      showView("editor");
+      selectedIdx = 0;
+      renderClipRail();
+      selectClip(0, true);
+      renderTranscriptPane();
+      drawHeatmap();
+      document.getElementById("tl-duration").textContent = fmtTime(sourceDuration);
+      document.getElementById("focus-note-ed").textContent =
+        focusInfo ? "🎯 AI analysis: " + focusInfo.label : "";
+      syncStylePills();
+    }
+
+    function syncStylePills() {
+      setActivePill("ed-caption-group", editorStyle.caption);
+      setActivePill("ed-framing-group", editorStyle.framing);
+      setActivePill("ed-ratio-group", editorStyle.ratio);
+    }
+
+    function renderClipRail() {
+      const list = document.getElementById("clip-list");
+      list.innerHTML = "";
+      clips.forEach((clip, i) => {
+        const el = document.createElement("div");
+        el.className = "clip-item" + (i === selectedIdx ? " selected" : "");
+        el.onclick = () => selectClip(i, true);
+        const thumb = clip.thumb_url
+          ? `<img src="${API}${clip.thumb_url}?t=${Date.now()}" alt="" />`
+          : `<div class="no-thumb">🎬</div>`;
+        el.innerHTML = `
+          ${thumb}
+          <span class="rank-chip">#${clip.rank}</span>
+          <span class="score-chip">${Math.round(clip.score * 100)}%</span>
+          <div class="ci-body">
+            <div class="ci-title">${escHtml(clip.title)}</div>
+            <div class="ci-meta"><span>⏱ ${clip.duration}s</span><span>${fmtTime(clip.start)} → ${fmtTime(clip.end)}</span></div>
+          </div>`;
+        list.appendChild(el);
+      });
+    }
+
+    function selectClip(i, resetTrimWin) {
+      selectedIdx = i;
+      const clip = clips[i];
+      document.querySelectorAll(".clip-item").forEach((el, j) =>
+        el.classList.toggle("selected", j === i));
+
+      const player = document.getElementById("player");
+      player.src = `${API}${clip.clip_url}?t=${Date.now()}`;
+      player.load();
+
+      document.getElementById("insp-title").textContent = clip.title;
+      document.getElementById("insp-caption").textContent = clip.caption;
+
+      if (clip.settings) {
+        editorStyle.caption = clip.settings.caption_style || editorStyle.caption;
+        editorStyle.framing = clip.settings.framing || editorStyle.framing;
+        editorStyle.ratio = clip.settings.aspect_ratio || editorStyle.ratio;
+        document.getElementById("ed-wm-toggle").checked = clip.settings.watermark !== false;
+        const m = clip.settings.manual || {};
+        manual.crop_x = m.crop_x ?? 0.5;
+        manual.crop_y = m.crop_y ?? 0.5;
+        manual.zoom = m.zoom || 1;
+        manual.rotate = m.rotate || 0;
+        syncStylePills();
+        syncManualControls();
+      }
+      setFramingUI();
+
+      if (resetTrimWin) {
+        const pad = 25;
+        trim.start = clip.start;
+        trim.end = clip.end;
+        trim.winStart = Math.max(0, clip.start - pad);
+        trim.winEnd = Math.min(sourceDuration || clip.end + pad, clip.end + pad);
+      }
+      clearDirty();
+      layoutTrim();
+      renderStats();
+      renderTranscriptPane();
+      drawHeatmap();
+    }
+
+    // ---------- trim strip ----------
+    const strip = document.getElementById("trim-strip");
+    const selEl = document.getElementById("trim-sel");
+    const handleL = document.getElementById("handle-l");
+    const handleR = document.getElementById("handle-r");
+
+    function tToX(t) {
+      const w = strip.clientWidth;
+      return (t - trim.winStart) / (trim.winEnd - trim.winStart) * w;
+    }
+    function xToT(x) {
+      const w = strip.clientWidth;
+      return trim.winStart + (x / w) * (trim.winEnd - trim.winStart);
+    }
+
+    function layoutTrim() {
+      const x1 = tToX(trim.start), x2 = tToX(trim.end);
+      selEl.style.left = x1 + "px";
+      selEl.style.width = Math.max(x2 - x1, 4) + "px";
+      handleL.style.left = (x1 - 7) + "px";
+      handleR.style.left = (x2 - 7) + "px";
+      document.getElementById("trim-times").textContent =
+        `${fmtTime(trim.start)} → ${fmtTime(trim.end)}  ·  ${(trim.end - trim.start).toFixed(1)}s`;
+      document.getElementById("scale-l").textContent = fmtTime(trim.winStart);
+      document.getElementById("scale-r").textContent = fmtTime(trim.winEnd);
+      drawTrimHeat();
+    }
+
+    function drawTrimHeat() {
+      const canvas = document.getElementById("trim-heat");
+      const w = canvas.width = strip.clientWidth * devicePixelRatio;
+      const h = canvas.height = strip.clientHeight * devicePixelRatio;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+      if (!transcriptData || !transcriptData.segments) return;
+      transcriptData.segments.forEach(seg => {
+        if (seg.end < trim.winStart || seg.start > trim.winEnd) return;
+        const x1 = tToX(seg.start) * devicePixelRatio;
+        const x2 = tToX(seg.end) * devicePixelRatio;
+        const barH = Math.max(seg.score, 0.05) * h * 0.9;
+        ctx.fillStyle = `rgba(124,92,252,${0.15 + seg.score * 0.5})`;
+        ctx.fillRect(x1, h - barH, Math.max(x2 - x1 - 1, 1), barH);
+      });
+    }
+
+    let drag = null; // {type: 'l'|'r'|'move', startX, origStart, origEnd}
+    function startDrag(e, type) {
+      e.preventDefault();
+      drag = { type, startX: e.clientX ?? e.touches[0].clientX, origStart: trim.start, origEnd: trim.end };
+    }
+    handleL.addEventListener("pointerdown", e => startDrag(e, "l"));
+    handleR.addEventListener("pointerdown", e => startDrag(e, "r"));
+    selEl.addEventListener("pointerdown", e => startDrag(e, "move"));
+
+    window.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const dx = e.clientX - drag.startX;
+      const dt = dx / strip.clientWidth * (trim.winEnd - trim.winStart);
+      const minLen = 2;
+      if (drag.type === "l") {
+        trim.start = clamp(drag.origStart + dt, trim.winStart, trim.end - minLen);
+      } else if (drag.type === "r") {
+        trim.end = clamp(drag.origEnd + dt, trim.start + minLen, trim.winEnd);
+      } else {
+        const len = drag.origEnd - drag.origStart;
+        let s = clamp(drag.origStart + dt, trim.winStart, trim.winEnd - len);
+        trim.start = s;
+        trim.end = s + len;
+      }
+      markDirty();
+      layoutTrim();
+    });
+    window.addEventListener("pointerup", () => drag = null);
+    window.addEventListener("resize", () => { layoutTrim(); drawHeatmap(); });
+
+    // playhead follows the preview player, mapped into source time
+    document.getElementById("player").addEventListener("timeupdate", e => {
+      const clip = clips[selectedIdx];
+      if (!clip) return;
+      const t = clip.start + e.target.currentTime;
+      const ph = document.getElementById("trim-playhead");
+      if (t >= trim.winStart && t <= trim.winEnd) {
+        ph.style.display = "block";
+        ph.style.left = tToX(t) + "px";
+      } else {
+        ph.style.display = "none";
+      }
+    });
+
+    function resetTrim() {
+      const clip = clips[selectedIdx];
+      trim.start = clip.start;
+      trim.end = clip.end;
+      editorStyle.caption = clip.settings?.caption_style || "karaoke";
+      editorStyle.framing = clip.settings?.framing || "fit";
+      editorStyle.ratio = clip.settings?.aspect_ratio || "9:16";
+      const m = clip.settings?.manual || {};
+      manual.crop_x = m.crop_x ?? 0.5;
+      manual.crop_y = m.crop_y ?? 0.5;
+      manual.zoom = m.zoom || 1;
+      manual.rotate = m.rotate || 0;
+      syncStylePills();
+      syncManualControls();
+      setFramingUI();
+      clearDirty();
+      layoutTrim();
+    }
+
+    function markDirty() {
+      dirty = true;
+      document.getElementById("dirty-dot").classList.add("show");
+    }
+    function clearDirty() {
+      dirty = false;
+      document.getElementById("dirty-dot").classList.remove("show");
+    }
+
+    // ---------- re-render ----------
+    async function applyRerender() {
+      if (rendering) return;
+      const clip = clips[selectedIdx];
+      rendering = true;
+      const btn = document.getElementById("apply-btn");
+      const orig = btn.innerHTML;
+      btn.innerHTML = `<span class="spinner"></span> Rendering…`;
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API}/api/clip/rerender`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            job_id: currentJobId,
+            rank: clip.rank,
+            start: trim.start,
+            end: trim.end,
+            aspect_ratio: editorStyle.ratio,
+            framing: editorStyle.framing,
+            caption_style: editorStyle.caption,
+            watermark: document.getElementById("ed-wm-toggle").checked,
+            watermark_text: document.getElementById("ed-wm-text").value || null,
+            crop_x: manual.crop_x,
+            crop_y: manual.crop_y,
+            zoom: manual.zoom,
+            rotate: manual.rotate,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Render failed");
+        }
+        const data = await res.json();
+        clips[selectedIdx] = data.clip;
+        renderClipRail();
+        selectClip(selectedIdx, false);
+        clearDirty();
+        toast("Clip re-rendered ✓");
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        rendering = false;
+        btn.innerHTML = orig;
+        btn.disabled = false;
+      }
+    }
+
+    // ---------- transcript pane ----------
+    function renderTranscriptPane() {
+      const list = document.getElementById("transcript-list");
+      if (!transcriptData || !(transcriptData.transcript || []).length) {
+        list.innerHTML = `<div style="padding:12px;color:var(--muted);">No speech detected in this video.</div>`;
+        return;
+      }
+      const clip = clips[selectedIdx];
+      list.innerHTML = "";
+      transcriptData.transcript.forEach(seg => {
+        const el = document.createElement("div");
+        const inRange = clip && seg.end > trim.start && seg.start < trim.end;
+        el.className = "transcript-seg" + (inRange ? " in-range" : "");
+        el.innerHTML = `<span class="ts">${fmtTime(seg.start)}</span>${escHtml(seg.text)}`;
+        el.onclick = () => {
+          const player = document.getElementById("player");
+          if (clip && seg.start >= clip.start && seg.start <= clip.end) {
+            player.currentTime = seg.start - clip.start;
+            player.play();
+          } else {
+            // outside the clip — extend the trim window to include it
+            trim.start = Math.min(trim.start, Math.max(0, seg.start - 1));
+            trim.end = Math.max(trim.end, seg.end + 1);
+            trim.winStart = Math.max(0, trim.start - 15);
+            trim.winEnd = Math.min(sourceDuration, trim.end + 15);
+            markDirty();
+            layoutTrim();
+            renderTranscriptPane();
+            toast("Trim extended — hit Apply to re-render");
+          }
+        };
+        list.appendChild(el);
+      });
+    }
+
+    // ---------- stats pane ----------
+    function renderStats() {
+      const clip = clips[selectedIdx];
+      document.getElementById("stat-score").textContent = Math.round(clip.score * 100) + "%";
+      const bd = clip.breakdown || {};
+      const labels = { hook: "Hook strength", climax: "Climax moment", audio: "Audio energy", scene: "Visual action", text: "Text signals" };
+      const wrap = document.getElementById("stat-breakdown");
+      wrap.innerHTML = "";
+      Object.entries(labels).forEach(([k, label]) => {
+        const v = bd[k] ?? 0;
+        wrap.innerHTML += `
+          <div class="score-row">
+            <div class="sr-head"><span class="k">${label}</span><span class="v">${Math.round(v * 100)}%</span></div>
+            <div class="score-track"><div class="score-fill" style="width:${Math.round(v * 100)}%"></div></div>
+          </div>`;
+      });
+      document.getElementById("stat-timing").innerHTML =
+        `In: ${fmtTime(clip.start)}<br/>Out: ${fmtTime(clip.end)}<br/>Length: ${clip.duration}s`;
+    }
+
+    // ---------- heatmap ----------
+    function drawHeatmap() {
+      const canvas = document.getElementById("heatmap");
+      if (!canvas.offsetParent) return;
+      const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+      const h = canvas.height = 56 * devicePixelRatio;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+      if (!sourceDuration) return;
+
+      if (transcriptData && transcriptData.segments) {
+        transcriptData.segments.forEach(seg => {
+          const x1 = seg.start / sourceDuration * w;
+          const x2 = seg.end / sourceDuration * w;
+          const barH = Math.max(seg.score, 0.04) * h * 0.85;
+          ctx.fillStyle = `rgba(124,92,252,${0.12 + seg.score * 0.55})`;
+          ctx.fillRect(x1, h - barH, Math.max(x2 - x1 - 1, 1), barH);
+        });
+      }
+
+      clips.forEach((clip, i) => {
+        const x1 = clip.start / sourceDuration * w;
+        const x2 = clip.end / sourceDuration * w;
+        ctx.fillStyle = i === selectedIdx ? "rgba(252,92,170,.28)" : "rgba(255,255,255,.09)";
+        ctx.fillRect(x1, 0, x2 - x1, h);
+        ctx.strokeStyle = i === selectedIdx ? "#fc5caa" : "rgba(255,255,255,.35)";
+        ctx.lineWidth = 2 * devicePixelRatio;
+        ctx.strokeRect(x1 + 1, 1, x2 - x1 - 2, h - 2);
+        ctx.fillStyle = i === selectedIdx ? "#fc5caa" : "rgba(255,255,255,.6)";
+        ctx.font = `${11 * devicePixelRatio}px -apple-system, sans-serif`;
+        ctx.fillText("#" + clip.rank, x1 + 5 * devicePixelRatio, 13 * devicePixelRatio);
+      });
+    }
+
+    document.getElementById("heatmap").addEventListener("click", e => {
+      if (!sourceDuration) return;
+      const rect = e.target.getBoundingClientRect();
+      const t = (e.clientX - rect.left) / rect.width * sourceDuration;
+      let best = -1, bestDist = Infinity;
+      clips.forEach((clip, i) => {
+        if (t >= clip.start && t <= clip.end) { best = i; bestDist = 0; }
+        else {
+          const d = Math.min(Math.abs(t - clip.start), Math.abs(t - clip.end));
+          if (d < bestDist) { bestDist = d; best = i; }
+        }
+      });
+      if (best >= 0) selectClip(best, true);
+    });
+
+    // ---------- downloads / misc ----------
+    function downloadAll() {
+      if (!currentJobId) return;
+      window.location.href = `${API}/api/download/${currentJobId}.zip`;
+    }
+
+    function copyCaption(btn) {
+      const clip = clips[selectedIdx];
+      navigator.clipboard.writeText(clip.caption || clip.title);
+      btn.textContent = "✓ Copied";
+      setTimeout(() => btn.textContent = "Copy caption", 1800);
+    }
+
+    // ---------- recent projects ----------
+    async function loadRecent() {
+      try {
+        const res = await fetch(`${API}/api/jobs`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const doneJobs = (data.jobs || []).filter(j => j.status === "done" && j.num_clips > 0);
+        const card = document.getElementById("recent-card");
+        if (!doneJobs.length) { card.style.display = "none"; return; }
+        card.style.display = "block";
+        const list = document.getElementById("recent-list");
+        list.innerHTML = "";
+        doneJobs.slice(0, 6).forEach(job => {
+          const el = document.createElement("div");
+          el.className = "recent-item";
+          const when = job.created ? new Date(job.created * 1000).toLocaleString() : "";
+          el.innerHTML = `
+            <span class="badge done">✓ ${job.num_clips} clips</span>
+            <span class="src">${escHtml(job.source || job.job_id)}</span>
+            <span class="meta">${when}</span>`;
+          el.onclick = () => openRecent(job.job_id, job.source);
+          list.appendChild(el);
+        });
+      } catch { /* backend offline — fine on the setup screen */ }
+    }
+
+    async function openRecent(jobId, source) {
+      try {
+        const res = await fetch(`${API}/api/status/${jobId}`);
+        const data = await res.json();
+        if (data.status !== "done" || !(data.clips || []).length) return toast("Project no longer available", true);
+        currentJobId = jobId;
+        jobSource = source || data.source || "";
+        clips = data.clips;
+        if (data.settings) {
+          editorStyle.caption = data.settings.caption_style || "karaoke";
+          editorStyle.framing = data.settings.framing || "fit";
+          editorStyle.ratio = data.settings.aspect_ratio || "9:16";
+        }
+        await loadTranscript(jobId);
+        enterEditor();
+      } catch { toast("Could not load project", true); }
+    }
+
+    // ---------- helpers ----------
+    function toast(msg, isErr) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.className = "toast show" + (isErr ? " err" : "");
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove("show"), 3200);
+    }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function fmtTime(secs) {
+      secs = Math.max(0, secs || 0);
+      const m = Math.floor(secs / 60).toString().padStart(2, "0");
+      const s = Math.floor(secs % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+    function escHtml(t) {
+      return String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function showError(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+    function hideError(id) { document.getElementById(id).style.display = "none"; }
+
+    function setTab(name) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      document.getElementById("pane-" + name).classList.add("active");
+    }
+
+    // keyboard: space toggles playback inside the editor
+    window.addEventListener("keydown", e => {
+      if (e.code !== "Space") return;
+      if (!document.getElementById("view-editor").classList.contains("active")) return;
+      if (/INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+      e.preventDefault();
+      const p = document.getElementById("player");
+      p.paused ? p.play() : p.pause();
+    });
+
+    // remember original step icons so ✓ can be restored on new runs
+    document.querySelectorAll("#steps .dot").forEach(d => d.dataset.icon = d.textContent);
+
+    initApi().then(async () => { if (await requireLogin()) loadRecent(); });
+  </script>
+</body>
+</html>

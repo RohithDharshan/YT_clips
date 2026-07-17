@@ -15,7 +15,7 @@ except Exception:
 
 
 CLIPS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../clips"))
-DEFAULT_WATERMARK = "Project Ray"
+DEFAULT_WATERMARK = "ClipMind"
 
 DURATION_PRESETS = {
     "<30s": (15, 30),

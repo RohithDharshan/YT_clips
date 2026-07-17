@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign up — ClipMind</title>
+  <link rel="icon" type="image/png" href="assets/clipmind.png" />
+  <style>
+    :root {
+      --bg: #05050a;
+      --card: #0d0d17;
+      --border: #1d1d2f;
+      --border-hi: #2c2c47;
+      --text: #eeedf7;
+      --muted: #8a89a6;
+      --danger: #fc5c6c;
+      --success: #3dd68c;
+      --blue: #2f7bf6;
+      --violet: #7b3bed;
+      --magenta: #e042d8;
+      --grad: linear-gradient(135deg, var(--blue), var(--violet) 55%, var(--magenta));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+    }
+    a { color: inherit; text-decoration: none; }
+    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .brand-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 56px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 70% 60% at 30% 30%, rgba(47, 123, 246, .16), transparent 70%),
+        radial-gradient(ellipse 70% 60% at 75% 80%, rgba(224, 66, 216, .13), transparent 70%),
+        #07070f;
+      border-right: 1px solid var(--border);
+    }
+    .bp-logo { display: flex; align-items: center; gap: 11px; font-weight: 800; font-size: 19px; letter-spacing: -.4px; }
+    .bp-logo img { width: 32px; height: 32px; object-fit: contain; }
+    .bp-center { max-width: 460px; }
+    .bp-center img { width: 130px; height: 130px; object-fit: contain; margin-bottom: 30px; filter: drop-shadow(0 20px 50px rgba(123, 59, 237, .5)); animation: bob 6s ease-in-out infinite; }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+    .bp-center h2 { font-size: clamp(28px, 3.4vw, 40px); font-weight: 800; letter-spacing: -1.2px; line-height: 1.12; }
+    .bp-center p { margin-top: 16px; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .bp-perks { margin-top: 26px; display: flex; flex-direction: column; gap: 12px; }
+    .bp-perks div { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--muted); }
+    .bp-perks span { color: var(--success); font-weight: 800; }
+    .bp-foot { color: #55546e; font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
+
+    .form-pane {
+      width: min(520px, 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 44px;
+    }
+    .form-box { width: 100%; max-width: 360px; }
+    .form-box h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; }
+    .form-box .sub { margin-top: 8px; color: var(--muted); font-size: 13.5px; margin-bottom: 30px; }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 8px; letter-spacing: .03em; }
+    .field .wrap { position: relative; }
+    .field input {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 13px 15px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .18s, box-shadow .18s;
+      font-family: inherit;
+    }
+    .field input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(123, 59, 237, .18); }
+    .field .toggle-pw {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit;
+    }
+    .field .err { display: none; margin-top: 7px; font-size: 12px; color: var(--danger); }
+    .field.invalid input { border-color: var(--danger); }
+    .field.invalid .err { display: block; }
+
+    .pw-meter { display: flex; gap: 5px; margin-top: 9px; }
+    .pw-meter span { flex: 1; height: 3.5px; border-radius: 2px; background: var(--border-hi); transition: background .25s; }
+    .pw-meter.s1 span:nth-child(1) { background: var(--danger); }
+    .pw-meter.s2 span:nth-child(-n+2) { background: #fcb25c; }
+    .pw-meter.s3 span:nth-child(-n+3) { background: var(--success); }
+
+    .banner {
+      display: none;
+      background: rgba(252, 92, 108, .1);
+      border: 1px solid rgba(252, 92, 108, .45);
+      color: var(--danger);
+      border-radius: 10px;
+      padding: 12px 15px;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .submit {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 11px;
+      background: var(--grad);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      transition: transform .18s, box-shadow .18s, opacity .18s;
+      box-shadow: 0 8px 26px rgba(123, 59, 237, .35);
+      margin-top: 8px;
+    }
+    .submit:hover { transform: translateY(-1px); box-shadow: 0 12px 34px rgba(123, 59, 237, .5); }
+    .submit:disabled { opacity: .6; pointer-events: none; }
+    .spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+    .submit.loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .fine { margin-top: 14px; font-size: 11.5px; color: #55546e; text-align: center; line-height: 1.6; }
+    .alt { margin-top: 22px; text-align: center; font-size: 13px; color: var(--muted); }
+    .alt a { color: #b79bff; font-weight: 700; }
+    .alt a:hover { text-decoration: underline; }
+    .back { display: inline-flex; margin-top: 30px; font-size: 12.5px; color: var(--muted); }
+    .back:hover { color: var(--text); }
+
+    @media (max-width: 860px) {
+      .brand-pane { display: none; }
+      .form-pane { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="brand-pane">
+    <a class="bp-logo" href="index.html"><img src="assets/clipmind.png" alt="" /><span>Clip<span class="grad-text">Mind</span></span></a>
+    <div class="bp-center">
+      <img src="assets/clipmind.png" alt="" />
+      <h2>Start creating<br /><span class="grad-text">in minutes.</span></h2>
+      <p>One account unlocks the full ClipMind studio — AI highlights, smart reframing, captions and the per-clip editor.</p>
+      <div class="bp-perks">
+        <div><span>✓</span> Free to start — no credit card</div>
+        <div><span>✓</span> YouTube links or your own files</div>
+        <div><span>✓</span> Every clip editable before you post</div>
+      </div>
+    </div>
+    <div class="bp-foot">A product of Rojit Enterprises Pvt Ltd</div>
+  </aside>
+
+  <main class="form-pane">
+    <div class="form-box">
+      <h1>Create your account</h1>
+      <div class="sub">Think Less. Create More.</div>
+
+      <div class="banner" id="banner"></div>
+
+      <form id="form" novalidate>
+        <div class="field" id="f-name">
+          <label for="name">FULL NAME</label>
+          <div class="wrap"><input id="name" type="text" autocomplete="name" placeholder="Your name" /></div>
+          <div class="err">Please enter your name</div>
+        </div>
+        <div class="field" id="f-email">
+          <label for="email">EMAIL</label>
+          <div class="wrap"><input id="email" type="email" autocomplete="email" placeholder="you@example.com" /></div>
+          <div class="err">Enter a valid email address</div>
+        </div>
+        <div class="field" id="f-pw">
+          <label for="password">PASSWORD</label>
+          <div class="wrap">
+            <input id="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+            <button type="button" class="toggle-pw" onclick="togglePw(this)">SHOW</button>
+          </div>
+          <div class="pw-meter" id="pw-meter"><span></span><span></span><span></span></div>
+          <div class="err">Password must be at least 8 characters</div>
+        </div>
+        <button class="submit" id="submit" type="submit"><span class="spinner"></span><span>Create account</span></button>
+        <div class="fine">By creating an account you agree to the ClipMind terms of service.</div>
+      </form>
+
+      <div class="alt">Already have an account? <a href="login.html">Log in</a></div>
+      <a class="back" href="index.html">← Back to home</a>
+    </div>
+  </main>
+
+  <script>
+    let API = window.__API_URL__ || "http://localhost:8000";
+    async function initApi() {
+      if (window.__API_URL__) return;
+      for (const base of ["http://localhost:8000", "http://localhost:8010", "http://localhost:8001"]) {
+        try {
+          const res = await fetch(base + "/", { signal: AbortSignal.timeout(1200) });
+          const data = await res.json();
+          if (data && /ClipMind|Project Ray/.test(String(data.status || ""))) { API = base; return; }
+        } catch {}
+      }
+    }
+    const ready = initApi().then(async () => {
+      const token = localStorage.getItem("cm_token");
+      if (!token) return;
+      try {
+        const res = await fetch(`${API}/api/auth/me`, { headers: { Authorization: "Bearer " + token } });
+        if (res.ok) window.location.href = "studio.html";
+      } catch {}
+    });
+
+    function togglePw(btn) {
+      const input = btn.parentElement.querySelector("input");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "HIDE" : "SHOW";
+    }
+
+    document.getElementById("password").addEventListener("input", e => {
+      const v = e.target.value;
+      const strength = v.length >= 12 && /[0-9]/.test(v) && /[^a-zA-Z0-9]/.test(v) ? 3
+                     : v.length >= 8 && /[0-9a-zA-Z]/.test(v) ? 2
+                     : v.length > 0 ? 1 : 0;
+      document.getElementById("pw-meter").className = "pw-meter" + (strength ? " s" + strength : "");
+    });
+
+    document.getElementById("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      await ready;
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const banner = document.getElementById("banner");
+      banner.style.display = "none";
+
+      const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email);
+      document.getElementById("f-name").classList.toggle("invalid", !name);
+      document.getElementById("f-email").classList.toggle("invalid", !emailOk);
+      document.getElementById("f-pw").classList.toggle("invalid", password.length < 8);
+      if (!name || !emailOk || password.length < 8) return;
+
+      const btn = document.getElementById("submit");
+      btn.classList.add("loading");
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API}/api/auth/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Could not create the account");
+        localStorage.setItem("cm_token", data.token);
+        localStorage.setItem("cm_name", data.name);
+        window.location.href = "studio.html";
+      } catch (err) {
+        banner.textContent = err.message === "Failed to fetch"
+          ? "Cannot reach the ClipMind server. Is it running?" : err.message;
+        banner.style.display = "block";
+      } finally {
+        btn.classList.remove("loading");
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

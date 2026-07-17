@@ -5,13 +5,15 @@ import time
 import uuid
 import zipfile
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (BackgroundTasks, Depends, FastAPI, File, Form, Header,
+                     HTTPException, UploadFile)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 
+import auth
 from pipeline.cache import get_cache, set_cache
 from pipeline.clipper import generate_clips, render_single_clip
 from pipeline.downloader import download_youtube
@@ -105,13 +107,63 @@ class RerenderRequest(ClipSettings):
     end: float
 
 
+def _bearer(authorization: Optional[str]) -> str:
+    return (authorization or "").removeprefix("Bearer ").strip()
+
+
+async def require_user(authorization: Optional[str] = Header(None)) -> dict:
+    user = auth.get_user(_bearer(authorization))
+    if not user:
+        raise HTTPException(401, "Login required")
+    return user
+
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
 @app.get("/")
 async def root():
-    return {"status": "Project Ray AI Clipper running"}
+    return {"status": "ClipMind (Project Ray) AI Clipper running"}
+
+
+@app.post("/api/auth/signup")
+async def api_signup(req: SignupRequest):
+    try:
+        return auth.signup(req.name, req.email, req.password)
+    except auth.AuthError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/auth/login")
+async def api_login(req: LoginRequest):
+    try:
+        return auth.login(req.email, req.password)
+    except auth.AuthError as e:
+        raise HTTPException(401, str(e))
+
+
+@app.post("/api/auth/logout")
+async def api_logout(authorization: Optional[str] = Header(None)):
+    auth.logout(_bearer(authorization))
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+async def api_me(user: dict = Depends(require_user)):
+    return {"name": user["name"], "email": user["email"]}
 
 
 @app.post("/api/process/youtube")
-async def process_youtube(req: YouTubeRequest, bg: BackgroundTasks):
+async def process_youtube(req: YouTubeRequest, bg: BackgroundTasks,
+                          user: dict = Depends(require_user)):
     job_id = str(uuid.uuid4())
     _update_job(job_id, status="queued", progress=0, detail="Queued", clips=[],
                 source=req.url, created=time.time(),
@@ -123,6 +175,7 @@ async def process_youtube(req: YouTubeRequest, bg: BackgroundTasks):
 @app.post("/api/process/upload")
 async def process_upload(
     bg: BackgroundTasks,
+    user: dict = Depends(require_user),
     file: UploadFile = File(...),
     duration_preset: str = Form("<1min"),
     duration_min: Optional[int] = Form(None),
@@ -169,7 +222,8 @@ async def process_upload(
 
 
 @app.post("/api/regenerate")
-async def regenerate(req: GenerateRequest, bg: BackgroundTasks):
+async def regenerate(req: GenerateRequest, bg: BackgroundTasks,
+                     user: dict = Depends(require_user)):
     cached = get_cache(req.job_id)
     if not cached:
         raise HTTPException(404, "Job not found or cache expired")
@@ -184,7 +238,7 @@ async def regenerate(req: GenerateRequest, bg: BackgroundTasks):
 
 
 @app.post("/api/clip/rerender")
-async def rerender_clip(req: RerenderRequest):
+async def rerender_clip(req: RerenderRequest, user: dict = Depends(require_user)):
     cached = get_cache(req.job_id)
     if not cached:
         raise HTTPException(404, "Job not found or cache expired")
@@ -292,7 +346,7 @@ async def download_all(job_id: str):
 
 
 @app.delete("/api/job/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, user: dict = Depends(require_user)):
     job = jobs.pop(job_id, None)
     _save_jobs()
     if job:
