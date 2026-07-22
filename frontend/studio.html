@@ -60,6 +60,18 @@
     .btn-ghost { background: transparent; color: var(--muted); border: none; }
     .btn-ghost:hover { color: var(--text); }
     .btn-sm { padding: 7px 14px; font-size: 12.5px; }
+    .btn-grad-sm {
+      padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: 100px;
+      background: linear-gradient(135deg, #2f7bf6, #7b3bed 55%, #e042d8);
+      color: #fff; display: inline-flex; align-items: center;
+    }
+    .btn-grad-sm:hover { filter: brightness(1.1); }
+    .plan-badge {
+      font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border-hi);
+      color: var(--muted);
+    }
+    .plan-badge.pro { color: #fff; border-color: transparent; background: linear-gradient(135deg, #2f7bf6, #7b3bed 55%, #e042d8); }
 
     .pill {
       padding: 8px 16px;
@@ -559,6 +571,10 @@
       <button class="btn btn-primary btn-sm" onclick="downloadAll()">⬇ Download all (.zip)</button>
     </div>
     <div class="header-right" id="user-chip" style="display:none;">
+      <span class="plan-badge" id="plan-badge">Free</span>
+      <span id="usage-note" style="font-size:11.5px;color:var(--muted);"></span>
+      <a class="btn btn-grad-sm" id="upgrade-btn" href="pricing.html" style="display:none;">Upgrade</a>
+      <img id="user-avatar" src="" alt="" style="width:26px;height:26px;border-radius:50%;display:none;object-fit:cover;" />
       <span id="user-name" style="font-size:12.5px;color:var(--muted);"></span>
       <button class="btn btn-ghost btn-sm" onclick="logoutUser()">Log out</button>
     </div>
@@ -847,7 +863,7 @@
         try {
           const res = await fetch(base + "/", { signal: AbortSignal.timeout(1200) });
           const data = await res.json();
-          if (data && String(data.status || "").includes("Project Ray")) { API = base; return; }
+          if (data && String(data.status || "").includes("ClipMind")) { API = base; return; }
         } catch { /* try next */ }
       }
     }
@@ -865,12 +881,32 @@
         const me = await res.json();
         document.getElementById("user-name").textContent = me.name;
         document.getElementById("user-chip").style.display = "flex";
+        if (me.avatar) {
+          const av = document.getElementById("user-avatar");
+          av.src = me.avatar;
+          av.style.display = "inline-block";
+        }
+        refreshBilling();
         return true;
       } catch {
         localStorage.removeItem("cm_token");
         window.location.href = "login.html";
         return false;
       }
+    }
+
+    async function refreshBilling() {
+      try {
+        const res = await fetch(`${API}/api/billing`, { headers: authHeaders() });
+        if (!res.ok) return;
+        const b = await res.json();
+        const badge = document.getElementById("plan-badge");
+        badge.textContent = b.limits.label;
+        badge.classList.toggle("pro", b.plan === "pro");
+        document.getElementById("usage-note").textContent =
+          `${b.usage.videos}/${b.limits.videos_per_month} videos this month`;
+        document.getElementById("upgrade-btn").style.display = b.plan === "free" ? "inline-flex" : "none";
+      } catch { /* non-fatal — billing chip just stays blank */ }
     }
     async function logoutUser() {
       try { await fetch(`${API}/api/auth/logout`, { method: "POST", headers: authHeaders() }); } catch {}
@@ -1152,12 +1188,20 @@
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ url, ...buildParams() }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw await apiError(res);
         const data = await res.json();
         startPolling(data.job_id);
       } catch (e) {
-        showError("url-error", "Could not reach the API. Is the backend running on port 8000?");
+        showError("url-error", e.message || "Could not reach the API. Is the backend running?");
       }
+    }
+
+    async function apiError(res) {
+      let detail = `Request failed (${res.status})`;
+      try { detail = (await res.json()).detail || detail; } catch {}
+      if (res.status === 402) detail += " — see Upgrade in the header.";
+      if (res.status === 401) { localStorage.removeItem("cm_token"); window.location.href = "login.html"; }
+      return new Error(detail);
     }
 
     function fileSelected(input) {
@@ -1188,11 +1232,11 @@
       Object.entries(buildParams()).forEach(([k, v]) => { if (v !== null) fd.append(k, v); });
       try {
         const res = await fetch(`${API}/api/process/upload`, { method: "POST", headers: authHeaders(), body: fd });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw await apiError(res);
         const data = await res.json();
         startPolling(data.job_id);
       } catch (e) {
-        showError("url-error", "Upload failed. Is the backend running?");
+        showError("url-error", e.message || "Upload failed. Is the backend running?");
       }
     }
 
@@ -1263,6 +1307,7 @@
         }
         await loadTranscript(jobId);
         enterEditor();
+        refreshBilling();
       } else if (data.status === "error") {
         clearInterval(pollTimer);
         const el = document.getElementById("proc-error");

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — ClipMind</title>
+  <link rel="icon" type="image/png" href="assets/clipmind.png" />
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --bg: #05050a; --surface: #0b0b13; --card: #10101b;
+      --border: #1d1d2f; --border-hi: #2c2c47;
+      --text: #eeedf7; --muted: #8a89a6; --success: #3dd68c;
+      --blue: #2f7bf6; --violet: #7b3bed; --magenta: #e042d8;
+      --grad: linear-gradient(135deg, var(--blue), var(--violet) 55%, var(--magenta));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+    nav {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 clamp(20px, 4vw, 48px); height: 66px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(5,5,10,.8); backdrop-filter: blur(14px);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18.5px; }
+    .nav-brand img { width: 28px; height: 28px; object-fit: contain; }
+    .nav-cta { margin-left: auto; display: flex; gap: 10px; }
+    .btn { padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
+    .btn-grad { background: var(--grad); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border-hi); }
+
+    main { max-width: 1000px; margin: 0 auto; padding: 80px 24px 100px; }
+    .head { text-align: center; margin-bottom: 60px; }
+    .head h1 { font-size: clamp(32px, 5vw, 50px); font-weight: 800; letter-spacing: -1.5px; }
+    .head p { margin-top: 14px; color: var(--muted); font-size: 16px; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 48px; }
+    .toggle-row span { font-size: 13.5px; color: var(--muted); font-weight: 600; }
+    .toggle-row span.active { color: var(--text); }
+    .switch { position: relative; width: 42px; height: 24px; cursor: pointer; }
+    .switch input { display: none; }
+    .switch .track { position: absolute; inset: 0; background: var(--border-hi); border-radius: 100px; transition: background .2s; }
+    .switch .thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .switch input:checked + .track { background: var(--violet); }
+    .switch input:checked + .track + .thumb { transform: translateX(18px); }
+    .save-chip { font-size: 11px; font-weight: 800; color: var(--success); background: rgba(61,214,140,.12); padding: 3px 9px; border-radius: 100px; }
+
+    .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .plan {
+      background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 36px 32px; position: relative;
+    }
+    .plan.pro { border-color: var(--violet); box-shadow: 0 0 0 1px rgba(123,59,237,.3), 0 30px 70px rgba(123,59,237,.15); }
+    .plan .badge {
+      position: absolute; top: -13px; left: 32px;
+      background: var(--grad); color: #fff; font-size: 11px; font-weight: 800;
+      padding: 5px 14px; border-radius: 100px; letter-spacing: .04em;
+    }
+    .plan h2 { font-size: 19px; font-weight: 800; }
+    .plan .price { margin-top: 18px; display: flex; align-items: baseline; gap: 6px; }
+    .plan .price .num { font-size: 46px; font-weight: 800; letter-spacing: -1.5px; }
+    .plan .price .per { color: var(--muted); font-size: 14px; }
+    .plan .desc { margin-top: 10px; color: var(--muted); font-size: 13.5px; line-height: 1.6; min-height: 40px; }
+    .plan .cta { display: block; text-align: center; margin-top: 26px; padding: 13px; border-radius: 11px; font-weight: 700; font-size: 14.5px; }
+    .plan.free .cta { background: var(--border-hi); color: var(--text); }
+    .plan.pro .cta { background: var(--grad); color: #fff; }
+    .plan ul { margin-top: 28px; display: flex; flex-direction: column; gap: 14px; }
+    .plan li { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+    .plan li b { color: var(--text); }
+    .plan li .ck { color: var(--success); font-weight: 800; flex-shrink: 0; }
+
+    .faq { margin-top: 90px; }
+    .faq h2 { font-size: 24px; font-weight: 800; text-align: center; margin-bottom: 36px; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: 20px 4px; }
+    .faq-item h3 { font-size: 14.5px; font-weight: 700; }
+    .faq-item p { margin-top: 8px; color: var(--muted); font-size: 13.5px; line-height: 1.65; }
+
+    @media (max-width: 720px) { .plans { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-brand" href="index.html"><img src="assets/clipmind.png" alt="" /><span>Clip<span class="grad-text">Mind</span></span></a>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="login.html">Log in</a>
+      <a class="btn btn-grad" href="signup.html">Sign up free</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="head">
+      <h1>Simple pricing.<br /><span class="grad-text">No surprises.</span></h1>
+      <p>Start free. Upgrade when you're ready to post more.</p>
+    </div>
+
+    <div class="toggle-row">
+      <span id="lbl-monthly" class="active">Monthly</span>
+      <label class="switch">
+        <input type="checkbox" id="annual-toggle" onchange="toggleAnnual(this.checked)" />
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+      <span id="lbl-annual">Annual</span>
+      <span class="save-chip">Save 20%</span>
+    </div>
+
+    <div class="plans">
+      <div class="plan free">
+        <h2>Free</h2>
+        <div class="price"><span class="num">$0</span><span class="per">forever</span></div>
+        <div class="desc">Try the full pipeline — perfect for the occasional clip.</div>
+        <a class="cta" href="signup.html">Start for free</a>
+        <ul id="free-features"></ul>
+      </div>
+
+      <div class="plan pro">
+        <span class="badge">Most popular</span>
+        <h2>Pro</h2>
+        <div class="price"><span class="num" id="pro-price">$15</span><span class="per">/ month</span></div>
+        <div class="desc" id="pro-desc">For creators posting regularly across formats.</div>
+        <a class="cta" href="signup.html">Upgrade to Pro</a>
+        <ul id="pro-features"></ul>
+      </div>
+    </div>
+
+    <div class="faq">
+      <h2>Questions</h2>
+      <div class="faq-item">
+        <h3>What counts as "a video"?</h3>
+        <p>Every time you paste a YouTube link or upload a file and generate clips from it, that's one video against your monthly quota. Re-rendering or restyling clips from a video you already processed is always free and doesn't count again.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What happens if I go over my source-length limit?</h3>
+        <p>ClipMind checks the video's length before transcribing it. If it's longer than your plan allows, you'll get a clear message and nothing is charged against your quota — just trim the video or upgrade.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Can I cancel anytime?</h3>
+        <p>Yes — Pro is billed monthly (or annually at a discount) with no lock-in. Cancelling keeps your account on the Free plan going forward.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Do I need a credit card for the Free plan?</h3>
+        <p>No. Sign in with your Google account and you're creating clips in under a minute.</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Limits mirror backend/config.py — keep in sync if you change the tiers there.
+    const LIMITS = {
+      free: { videos_per_month: 5, max_source_minutes: 15, max_clips_per_video: 3, max_resolution: 720 },
+      pro:  { videos_per_month: 50, max_source_minutes: 90, max_clips_per_video: 10, max_resolution: 1080 },
+    };
+    const PRICE = { monthly: 15, annual: 12 };
+
+    function renderFeatures(id, plan) {
+      const L = LIMITS[plan];
+      const items = plan === "free" ? [
+        `<b>${L.videos_per_month} videos</b> per month`,
+        `Up to <b>${L.max_source_minutes} min</b> source video`,
+        `Up to <b>${L.max_clips_per_video} clips</b> per video`,
+        `<b>${L.max_resolution}p</b> export`,
+        `AI highlight detection &amp; smart reframing`,
+        `Karaoke, bold &amp; minimal captions`,
+        `ClipMind watermark on exports`,
+      ] : [
+        `<b>${L.videos_per_month} videos</b> per month`,
+        `Up to <b>${L.max_source_minutes} min</b> source video`,
+        `Up to <b>${L.max_clips_per_video} clips</b> per video`,
+        `<b>${L.max_resolution}p</b> full-quality export`,
+        `Everything in Free, plus:`,
+        `<b>No watermark</b>`,
+        `Priority rendering queue`,
+      ];
+      document.getElementById(id).innerHTML = items.map(t => `<li><span class="ck">✓</span><span>${t}</span></li>`).join("");
+    }
+    renderFeatures("free-features", "free");
+    renderFeatures("pro-features", "pro");
+
+    function toggleAnnual(annual) {
+      document.getElementById("lbl-monthly").classList.toggle("active", !annual);
+      document.getElementById("lbl-annual").classList.toggle("active", annual);
+      document.getElementById("pro-price").textContent = "$" + (annual ? PRICE.annual : PRICE.monthly);
+      document.getElementById("pro-desc").textContent = annual
+        ? "Billed annually — 2 months free vs. paying monthly."
+        : "For creators posting regularly across formats.";
+    }
+  </script>
+</body>
+</html>

@@ -185,6 +185,8 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
         "rotate": getattr(req, "rotate", 0.0),
     }
 
+    max_dim = getattr(req, "max_dim", 1080) or 1080
+
     trimmed = _trim_video(video_path, start, end)
     try:
         _compose(
@@ -196,6 +198,7 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
             watermark_text=watermark_text if watermark_on else None,
             focus_subject=focus_subject,
             manual=manual,
+            max_dim=max_dim,
         )
     finally:
         if os.path.exists(trimmed):
@@ -226,9 +229,9 @@ def _render_clip(job_id, rank, start, end, transcript, video_path,
 
 
 def _compose(src, dst, ratio_w, ratio_h, framing, words, caption_style, watermark_text,
-             focus_subject="face", manual=None):
+             focus_subject="face", manual=None, max_dim=1080):
     """Single cv2 pass: reframe + captions + watermark, then mux audio + encode."""
-    out_w, out_h = _compute_output_size_from_ratio(ratio_w, ratio_h)
+    out_w, out_h = _compute_output_size_from_ratio(ratio_w, ratio_h, max_dim)
 
     cap = cv2.VideoCapture(src)
     src_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -821,14 +824,17 @@ def _trim_video(video_path, start, end):
     return tmp
 
 
-def _compute_output_size_from_ratio(ratio_w, ratio_h):
+def _compute_output_size_from_ratio(ratio_w, ratio_h, max_dim=1080):
+    """max_dim is the reference resolution — e.g. 720 for the Free plan,
+    1080 for Pro — matching standard 720p/1080p conventions per orientation."""
+    ref = max(min(int(max_dim), 1080), 480)
     if ratio_w < ratio_h:
-        out_h = 1080
+        out_h = ref
         out_w = int(out_h * ratio_w / ratio_h)
     elif ratio_w == ratio_h:
-        out_w = out_h = 1080
+        out_w = out_h = ref
     else:
-        out_w = 1920
+        out_w = int(ref * 16 / 9)  # 1080 -> 1920, 720 -> 1280
         out_h = int(out_w * ratio_h / ratio_w)
     # libx264 requires even dimensions
     return out_w + (out_w % 2), out_h + (out_h % 2)

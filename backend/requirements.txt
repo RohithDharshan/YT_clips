@@ -15,3 +15,6 @@ pydantic==2.9.2
 python-dotenv==1.0.1
 mediapipe==0.10.14
 scipy==1.14.1
+google-auth==2.34.0
+requests==2.32.3
+slowapi==0.1.9

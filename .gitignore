@@ -10,3 +10,5 @@ __pycache__/
 youtube_cookies.txt
 *.json.lock
 ruvector.db
+backend/.env
+frontend/config.js
