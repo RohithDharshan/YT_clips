@@ -444,13 +444,10 @@
       display: flex; align-items: center; gap: 12px;
       color: var(--muted); font-size: 12.5px;
     }
-    .foot-company .chip {
-      background: #fff;
-      border-radius: 9px;
-      padding: 5px 8px;
-      display: flex; align-items: center;
-    }
-    .foot-company .chip img { height: 26px; width: auto; display: block; }
+    .foot-contact-link { color: var(--muted); font-size: 13px; font-weight: 600; transition: color .18s; }
+    .foot-contact-link:hover { color: var(--text); }
+    .foot-company .chip { display: flex; align-items: center; }
+    .foot-company .chip img { height: 30px; width: auto; display: block; }
     .foot-copy { width: 100%; text-align: center; margin-top: 34px; color: #55546e; font-size: 12px; letter-spacing: .04em; }
 
     /* reveal on scroll */
@@ -506,6 +503,7 @@
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
       <a href="pricing.html">Pricing</a>
+      <a href="contact.html">Contact</a>
     </div>
     <div class="nav-cta">
       <a class="login" href="login.html">Log in</a>
@@ -628,6 +626,7 @@
           </div>
         </div>
         <div class="foot-company">
+          <a href="contact.html" class="foot-contact-link">Contact us</a>
           <span>A product of</span>
           <span class="chip"><img src="assets/rojit.png" alt="Rojit Enterprises Pvt Ltd" /></span>
         </div>

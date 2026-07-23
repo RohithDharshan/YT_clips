@@ -42,6 +42,15 @@
     .head h1 { font-size: clamp(32px, 5vw, 50px); font-weight: 800; letter-spacing: -1.5px; }
     .head p { margin-top: 14px; color: var(--muted); font-size: 16px; }
 
+    .region-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; }
+    .region-row span { font-size: 13px; color: var(--muted); }
+    .region-select {
+      background: var(--card); border: 1px solid var(--border-hi); color: var(--text);
+      font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 100px;
+      font-family: inherit; cursor: pointer;
+    }
+    .region-note { text-align: center; font-size: 12px; color: #55546e; margin-bottom: 30px; }
+
     .toggle-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 48px; }
     .toggle-row span { font-size: 13.5px; color: var(--muted); font-weight: 600; }
     .toggle-row span.active { color: var(--text); }
@@ -90,6 +99,7 @@
   <nav>
     <a class="nav-brand" href="index.html"><img src="assets/clipmind.png" alt="" /><span>Clip<span class="grad-text">Mind</span></span></a>
     <div class="nav-cta">
+      <a class="btn btn-ghost" href="contact.html">Contact</a>
       <a class="btn btn-ghost" href="login.html">Log in</a>
       <a class="btn btn-grad" href="signup.html">Sign up free</a>
     </div>
@@ -100,6 +110,16 @@
       <h1>Simple pricing.<br /><span class="grad-text">No surprises.</span></h1>
       <p>Start free. Upgrade when you're ready to post more.</p>
     </div>
+
+    <div class="region-row">
+      <span id="region-label">Detecting your region…</span>
+      <select class="region-select" id="region-select" onchange="setRegion(this.value)">
+        <option value="a">🌍 US, UK, EU, Canada, Australia & similar</option>
+        <option value="b">🌎 Brazil, Mexico, Eastern Europe, China & similar</option>
+        <option value="c">🌏 India, Southeast Asia, Africa & similar</option>
+      </select>
+    </div>
+    <div class="region-note">Pricing is adjusted for where you are, in USD. Not right? Pick your region above.</div>
 
     <div class="toggle-row">
       <span id="lbl-monthly" class="active">Monthly</span>
@@ -157,7 +177,55 @@
       free: { videos_per_month: 5, max_source_minutes: 15, max_clips_per_video: 3, max_resolution: 720 },
       pro:  { videos_per_month: 50, max_source_minutes: 90, max_clips_per_video: 10, max_resolution: 1080 },
     };
-    const PRICE = { monthly: 15, annual: 12 };
+
+    // Regional (PPP-style) pricing, in USD — kept deliberately low: the goal
+    // right now is reach, not revenue. Tune here; nothing else to touch.
+    const REGION_PRICE = {
+      a: { monthly: 7, annual: 5, label: "Standard pricing" },
+      b: { monthly: 5, annual: 4, label: "Regional pricing" },
+      c: { monthly: 3, annual: 2, label: "Regional pricing" },
+    };
+    const REGION_LABELS = {
+      a: "US, UK, EU, Canada, Australia & similar",
+      b: "Brazil, Mexico, Eastern Europe, China & similar",
+      c: "India, Southeast Asia, Africa & similar",
+    };
+
+    // ISO country codes mapped to a tier. Anything not listed falls back to
+    // tier "a" (never guess a discount for a country we don't recognize).
+    const COUNTRY_TIER = {
+      // tier b — upper-middle income
+      BR:"b", MX:"b", AR:"b", CL:"b", CO:"b", PE:"b",
+      RU:"b", TR:"b", CN:"b", PL:"b", RO:"b", BG:"b", RS:"b", UA:"b",
+      MY:"b", TH:"b", ZA:"b", SA:"b", AE:"b", QA:"b", KW:"b",
+      // tier c — lower / lower-middle income, largest reach opportunity
+      IN:"c", PK:"c", BD:"c", NP:"c", LK:"c", MM:"c", KH:"c", LA:"c",
+      PH:"c", ID:"c", VN:"c",
+      NG:"c", KE:"c", GH:"c", EG:"c", ET:"c", TZ:"c", UG:"c", RW:"c",
+      MA:"c", DZ:"c", TN:"c",
+    };
+
+    let region = "a";
+
+    function setRegion(r) {
+      region = r;
+      document.getElementById("region-select").value = r;
+      document.getElementById("region-label").textContent = REGION_PRICE[r].label + ":";
+      const annual = document.getElementById("annual-toggle").checked;
+      toggleAnnual(annual);
+    }
+
+    async function detectRegion() {
+      try {
+        const res = await fetch("https://get.geojs.io/v1/ip/country.json", { signal: AbortSignal.timeout(2500) });
+        const data = await res.json();
+        const code = (data.country_code || "").toUpperCase();
+        setRegion(COUNTRY_TIER[code] || "a");
+      } catch {
+        setRegion("a"); // fail open to standard pricing if detection is blocked/unavailable
+      }
+    }
+    detectRegion();
 
     function renderFeatures(id, plan) {
       const L = LIMITS[plan];
@@ -186,9 +254,10 @@
     function toggleAnnual(annual) {
       document.getElementById("lbl-monthly").classList.toggle("active", !annual);
       document.getElementById("lbl-annual").classList.toggle("active", annual);
-      document.getElementById("pro-price").textContent = "$" + (annual ? PRICE.annual : PRICE.monthly);
+      const price = REGION_PRICE[region];
+      document.getElementById("pro-price").textContent = "$" + (annual ? price.annual : price.monthly);
       document.getElementById("pro-desc").textContent = annual
-        ? "Billed annually — 2 months free vs. paying monthly."
+        ? "Billed annually — for creators posting regularly across formats."
         : "For creators posting regularly across formats.";
     }
   </script>

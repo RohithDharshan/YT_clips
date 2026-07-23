@@ -46,14 +46,24 @@ No Client Secret is needed — the backend verifies the ID token's signature and
 
 | | Free | Pro |
 |---|---|---|
-| Price | $0 | **$15/month** ($12/mo billed annually) |
+| Price | $0 | **$3–$7/month** regional pricing (see below) |
 | Videos / month | 5 | 50 |
 | Max source length | 15 min | 90 min |
 | Clips per video | 3 | 10 |
 | Export resolution | 720p | 1080p |
 | Watermark | Forced on | Off |
 
-**Why these numbers:** the pipeline is fully CPU-bound (Whisper + OpenCV/MediaPipe + ffmpeg, no GPU needed), so marginal compute cost per video is small — a few cents even for a 10-minute video on a modest VPS. Limits exist to bound worst-case load and give Free users a real reason to upgrade, not because the compute is expensive. $15/mo matches the market (Opus.pro, Klap, Vidyo.ai all sit in the $15–30/mo range) for a generous, simple two-tier plan.
+**Pro is priced regionally (PPP-style), on purpose — the goal right now is reach, not revenue:**
+
+| Region tier | Monthly | Annual |
+|---|---|---|
+| Standard — US, UK, EU, Canada, Australia & similar | $7 | $5/mo |
+| Regional — Brazil, Mexico, Eastern Europe, China & similar | $5 | $4/mo |
+| Regional — India, Southeast Asia, Africa & similar | $3 | $2/mo |
+
+`frontend/pricing.html` auto-detects the visitor's country (via a free IP-geolocation lookup, [geojs.io](https://get.geojs.io)) and shows the matching tier, with a manual dropdown override in case detection is wrong or blocked. The mapping lives in that file's `COUNTRY_TIER`/`REGION_PRICE` objects — add countries or adjust prices there; `backend/config.py`'s `PRICING` only holds the "standard" tier number for when real billing is wired up (nothing charges different amounts by region yet — see the billing-stub note above).
+
+**Why these numbers:** the pipeline is fully CPU-bound (Whisper + OpenCV/MediaPipe + ffmpeg, no GPU needed), so marginal compute cost per video is small — a few cents even for a 10-minute video on a modest VPS. Limits exist to bound worst-case load and give Free users a real reason to upgrade, not to maximize revenue — pricing is intentionally below the market rate (Opus.pro, Klap, Vidyo.ai sit at $15–30/mo) to stay accessible in more places.
 
 Limits live in `backend/config.py` (`PLAN_LIMITS`, `PRICING`) — change the numbers there, no other code changes needed. They're mirrored in `frontend/pricing.html`'s `LIMITS`/`PRICE` constants for display; keep both in sync if you tune them.
 

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact us — ClipMind</title>
+  <link rel="icon" type="image/png" href="assets/clipmind.png" />
+  <style>
+    :root {
+      --bg: #05050a; --card: #10101b;
+      --border: #1d1d2f; --border-hi: #2c2c47;
+      --text: #eeedf7; --muted: #8a89a6; --success: #3dd68c;
+      --blue: #2f7bf6; --violet: #7b3bed; --magenta: #e042d8;
+      --grad: linear-gradient(135deg, var(--blue), var(--violet) 55%, var(--magenta));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+    nav {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 clamp(20px, 4vw, 48px); height: 66px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(5,5,10,.8); backdrop-filter: blur(14px);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18.5px; }
+    .nav-brand img { width: 28px; height: 28px; object-fit: contain; }
+    .nav-cta { margin-left: auto; display: flex; gap: 10px; }
+    .btn { padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
+    .btn-grad { background: var(--grad); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border-hi); }
+
+    main {
+      max-width: 620px; margin: 0 auto; padding: 80px 24px 100px;
+    }
+    .head { text-align: center; margin-bottom: 48px; }
+    .head h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 800; letter-spacing: -1.4px; }
+    .head p { margin-top: 14px; color: var(--muted); font-size: 15.5px; line-height: 1.6; }
+    .head .addr {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 18px;
+      font-size: 13.5px; color: #b79bff; font-weight: 700;
+      border: 1px solid var(--border-hi); border-radius: 100px; padding: 8px 16px;
+      cursor: pointer; background: var(--card);
+    }
+    .head .addr:hover { border-color: var(--violet); }
+    .copied { color: var(--success) !important; }
+
+    form {
+      background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+      padding: 36px 32px;
+    }
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 8px; letter-spacing: .03em; }
+    .field input, .field textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); padding: 13px 15px; font-size: 14px;
+      outline: none; transition: border-color .18s, box-shadow .18s; font-family: inherit; resize: vertical;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(123,59,237,.18); }
+    .field textarea { min-height: 140px; }
+    .field .err { display: none; margin-top: 7px; font-size: 12px; color: #fc5c6c; }
+    .field.invalid input, .field.invalid textarea { border-color: #fc5c6c; }
+    .field.invalid .err { display: block; }
+
+    .submit {
+      width: 100%; padding: 14px; border: none; border-radius: 11px;
+      background: var(--grad); color: #fff; font-size: 15px; font-weight: 800;
+      cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      transition: transform .18s, box-shadow .18s;
+      box-shadow: 0 8px 26px rgba(123, 59, 237, .35);
+    }
+    .submit:hover { transform: translateY(-1px); box-shadow: 0 12px 34px rgba(123, 59, 237, .5); }
+    .fine { margin-top: 16px; font-size: 12px; color: #55546e; text-align: center; line-height: 1.6; }
+
+    .back { display: block; text-align: center; margin-top: 30px; font-size: 12.5px; color: var(--muted); }
+    .back:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="nav-brand" href="index.html"><img src="assets/clipmind.png" alt="" /><span>Clip<span class="grad-text">Mind</span></span></a>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="login.html">Log in</a>
+      <a class="btn btn-grad" href="signup.html">Sign up free</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="head">
+      <h1>Get in touch</h1>
+      <p>Questions, feedback, partnership ideas — we read everything.<br />This opens your email app, addressed straight to us.</p>
+      <div class="addr" id="addr-chip" onclick="copyEmail()">✉️ rojitenterprise@gmail.com</div>
+    </div>
+
+    <form id="form" novalidate>
+      <div class="field" id="f-email">
+        <label for="email">YOUR EMAIL</label>
+        <input id="email" type="email" placeholder="you@example.com" />
+        <div class="err">Enter a valid email address</div>
+      </div>
+      <div class="field" id="f-subject">
+        <label for="subject">SUBJECT</label>
+        <input id="subject" type="text" placeholder="What's this about?" />
+        <div class="err">Please add a subject</div>
+      </div>
+      <div class="field" id="f-message">
+        <label for="message">MESSAGE</label>
+        <textarea id="message" placeholder="Tell us what's on your mind…"></textarea>
+        <div class="err">Please write a short message</div>
+      </div>
+      <button class="submit" type="submit">Open email to send →</button>
+      <div class="fine">Submitting opens a pre-filled email in your default mail app addressed to rojitenterprise@gmail.com — nothing is sent from this page directly.</div>
+    </form>
+
+    <a class="back" href="index.html">← Back to home</a>
+  </main>
+
+  <script>
+    const TO = "rojitenterprise@gmail.com";
+
+    function copyEmail() {
+      navigator.clipboard.writeText(TO).catch(() => {});
+      const chip = document.getElementById("addr-chip");
+      const orig = chip.textContent;
+      chip.textContent = "✓ Copied to clipboard";
+      chip.classList.add("copied");
+      setTimeout(() => { chip.textContent = orig; chip.classList.remove("copied"); }, 1800);
+    }
+
+    document.getElementById("form").addEventListener("submit", e => {
+      e.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const subject = document.getElementById("subject").value.trim();
+      const message = document.getElementById("message").value.trim();
+
+      const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email);
+      document.getElementById("f-email").classList.toggle("invalid", !emailOk);
+      document.getElementById("f-subject").classList.toggle("invalid", !subject);
+      document.getElementById("f-message").classList.toggle("invalid", !message);
+      if (!emailOk || !subject || !message) return;
+
+      const body = `${message}\n\n—\nFrom: ${email}`;
+      const mailto = `mailto:${TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailto;
+    });
+  </script>
+</body>
+</html>

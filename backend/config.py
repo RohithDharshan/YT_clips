@@ -39,5 +39,10 @@ PLAN_LIMITS = {
 
 PRICING = {
     "free": {"price_usd": 0, "period": "forever"},
-    "pro": {"price_usd": 15, "period": "month", "annual_price_usd": 12},
+    # Deliberately low — the priority right now is reach, not revenue.
+    # Actual display pricing is regional/PPP-adjusted; see
+    # frontend/pricing.html's REGION_PRICE (standard/regional/lower tiers:
+    # $7 / $5 / $3 per month, $5 / $4 / $2 annual). These backend numbers
+    # are the "standard" tier and only matter once real billing is wired up.
+    "pro": {"price_usd": 7, "period": "month", "annual_price_usd": 5},
 }
