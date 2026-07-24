@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — ClipMind</title>
+  <link rel="icon" type="image/png" href="assets/clipmind.png" />
+  <style>
+    :root {
+      --bg: #05050a; --card: #10101b; --surface: #0b0b13;
+      --border: #1d1d2f; --border-hi: #2c2c47;
+      --text: #eeedf7; --muted: #8a89a6; --success: #3dd68c; --danger: #fc5c6c; --warn: #fcb25c;
+      --blue: #2f7bf6; --violet: #7b3bed; --magenta: #e042d8;
+      --grad: linear-gradient(135deg, var(--blue), var(--violet) 55%, var(--magenta));
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ---------- login screen ---------- */
+    #login-view {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    }
+    .login-box {
+      width: 100%; max-width: 340px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 34px 30px;
+    }
+    .login-box .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; margin-bottom: 6px; }
+    .login-box .brand img { width: 26px; height: 26px; object-fit: contain; }
+    .login-box .tag { color: var(--muted); font-size: 12.5px; margin-bottom: 26px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 7px; letter-spacing: .03em; }
+    .field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+      color: var(--text); padding: 11px 13px; font-size: 13.5px; outline: none; font-family: inherit;
+      transition: border-color .18s;
+    }
+    .field input:focus { border-color: var(--violet); }
+    .login-submit {
+      width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--grad);
+      color: #fff; font-size: 14px; font-weight: 800; margin-top: 6px;
+    }
+    .login-err {
+      display: none; background: rgba(252,92,108,.1); border: 1px solid rgba(252,92,108,.4);
+      color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 16px;
+    }
+
+    /* ---------- dashboard ---------- */
+    #dash-view { display: none; }
+    header {
+      height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 28px;
+      border-bottom: 1px solid var(--border); background: var(--surface);
+    }
+    header .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 16.5px; }
+    header .brand img { width: 24px; height: 24px; object-fit: contain; }
+    header .badge {
+      font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 100px; border: 1px solid var(--border-hi); color: var(--muted);
+    }
+    header .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+    .btn { padding: 8px 15px; border-radius: 8px; font-size: 12.5px; font-weight: 700; border: none; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border-hi); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--violet); }
+    .btn-danger { background: rgba(252,92,108,.12); color: var(--danger); border: 1px solid rgba(252,92,108,.35); }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 32px 28px 60px; }
+
+    .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .stat-card .v { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+    .stat-card .k { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+    .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .table-scroll { overflow-x: auto; }
+    table { min-width: 760px; }
+    .table-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .table-head h2 { font-size: 14.5px; font-weight: 700; }
+    .table-head input {
+      margin-left: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 8px 12px; font-size: 12.5px; outline: none; width: 220px; font-family: inherit;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .05em; padding: 10px 20px; border-bottom: 1px solid var(--border);
+    }
+    td { padding: 12px 20px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    .u-name { font-weight: 700; }
+    .u-email { color: var(--muted); font-size: 12px; }
+    .plan-pill {
+      font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+      padding: 3px 9px; border-radius: 100px; border: 1px solid var(--border-hi); color: var(--muted);
+    }
+    .plan-pill.pro { color: #fff; border-color: transparent; background: var(--grad); }
+    .usage-bar { width: 90px; height: 5px; background: var(--bg); border-radius: 100px; overflow: hidden; margin-top: 5px; }
+    .usage-bar .fill { height: 100%; background: var(--grad); }
+    select.plan-select {
+      background: var(--bg); border: 1px solid var(--border-hi); color: var(--text);
+      border-radius: 7px; padding: 5px 8px; font-size: 12px; font-family: inherit; cursor: pointer;
+    }
+    .row-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: transparent; border: 1px solid var(--border-hi); color: var(--muted);
+      border-radius: 7px; padding: 5px 10px; font-size: 11.5px; font-weight: 600;
+    }
+    .icon-btn:hover { color: var(--text); }
+    .icon-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+    .empty { padding: 50px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--card); border: 1px solid var(--border-hi); color: var(--text);
+      padding: 11px 20px; border-radius: 100px; font-size: 13px; font-weight: 600;
+      transition: transform .3s; box-shadow: 0 10px 40px rgba(0,0,0,.5); z-index: 100;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: var(--danger); color: var(--danger); }
+
+    @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div id="login-view">
+    <div class="login-box">
+      <div class="brand"><img src="assets/clipmind.png" alt="" />Clip<span class="grad-text">Mind</span></div>
+      <div class="tag">Admin console</div>
+      <div class="login-err" id="login-err"></div>
+      <form id="login-form">
+        <div class="field">
+          <label>USERNAME</label>
+          <input id="username" type="text" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label>PASSWORD</label>
+          <input id="password" type="password" autocomplete="current-password" />
+        </div>
+        <button class="login-submit" type="submit">Log in</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="dash-view">
+    <header>
+      <div class="brand"><img src="assets/clipmind.png" alt="" />Clip<span class="grad-text">Mind</span></div>
+      <span class="badge">Admin</span>
+      <div class="right">
+        <button class="btn btn-ghost" onclick="showChangePassword()">Change password</button>
+        <button class="btn btn-ghost" onclick="logout()">Log out</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="table-card">
+        <div class="table-head">
+          <h2>Users</h2>
+          <input type="text" id="search" placeholder="Search name or email…" oninput="renderUsers()" />
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th><th>Plan</th><th>Usage this month</th><th>Joined</th><th>Last login</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="empty-state" style="display:none;">No users yet.</div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let API = window.__API_URL__ || "http://localhost:8000";
+    async function initApi() {
+      if (window.__API_URL__) return;
+      for (const base of ["http://localhost:8000", "http://localhost:8010", "http://localhost:8001"]) {
+        try {
+          const res = await fetch(base + "/", { signal: AbortSignal.timeout(1200) });
+          const data = await res.json();
+          if (data && /ClipMind/.test(String(data.status || ""))) { API = base; return; }
+        } catch {}
+      }
+    }
+    const apiReady = initApi();
+
+    let TOKEN = localStorage.getItem("cm_admin_token");
+    let users = [];
+
+    function authHeaders(extra) {
+      return Object.assign({ Authorization: "Bearer " + (TOKEN || "") }, extra || {});
+    }
+    function toast(msg, isErr) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.className = "toast show" + (isErr ? " err" : "");
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove("show"), 2800);
+    }
+    function fmtDate(ts) {
+      if (!ts) return "—";
+      return new Date(ts * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+    function escHtml(t) {
+      return String(t ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    async function boot() {
+      await apiReady;
+      if (!TOKEN) return showLogin();
+      try {
+        const res = await fetch(`${API}/api/admin/me`, { headers: authHeaders() });
+        if (!res.ok) throw 0;
+        showDash();
+      } catch {
+        localStorage.removeItem("cm_admin_token");
+        showLogin();
+      }
+    }
+    function showLogin() {
+      document.getElementById("login-view").style.display = "flex";
+      document.getElementById("dash-view").style.display = "none";
+    }
+    async function showDash() {
+      document.getElementById("login-view").style.display = "none";
+      document.getElementById("dash-view").style.display = "block";
+      await Promise.all([loadStats(), loadUsers()]);
+    }
+
+    document.getElementById("login-form").addEventListener("submit", async e => {
+      e.preventDefault();
+      await apiReady;
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const err = document.getElementById("login-err");
+      err.style.display = "none";
+      try {
+        const res = await fetch(`${API}/api/admin/login`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Login failed");
+        TOKEN = data.token;
+        localStorage.setItem("cm_admin_token", TOKEN);
+        showDash();
+      } catch (e2) {
+        err.textContent = e2.message === "Failed to fetch" ? "Cannot reach the ClipMind server." : e2.message;
+        err.style.display = "block";
+      }
+    });
+
+    async function logout() {
+      try { await fetch(`${API}/api/admin/logout`, { method: "POST", headers: authHeaders() }); } catch {}
+      localStorage.removeItem("cm_admin_token");
+      TOKEN = null;
+      showLogin();
+    }
+
+    async function showChangePassword() {
+      const pw = prompt("New admin password (min 12 characters):");
+      if (!pw) return;
+      try {
+        const res = await fetch(`${API}/api/admin/change-password`, {
+          method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ new_password: pw }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Could not change password");
+        toast("Password updated ✓");
+      } catch (e) {
+        toast(e.message, true);
+      }
+    }
+
+    async function loadStats() {
+      const res = await fetch(`${API}/api/admin/stats`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const s = await res.json();
+      const cards = [
+        { v: s.total_users, k: "Total users" },
+        { v: s.pro_users, k: "Pro users" },
+        { v: s.free_users, k: "Free users" },
+        { v: s.videos_this_month, k: "Videos this month" },
+        { v: s.total_jobs_on_disk, k: "Jobs on disk" },
+      ];
+      document.getElementById("stats-row").innerHTML = cards.map(c =>
+        `<div class="stat-card"><div class="v">${c.v}</div><div class="k">${c.k}</div></div>`).join("");
+    }
+
+    async function loadUsers() {
+      const res = await fetch(`${API}/api/admin/users`, { headers: authHeaders() });
+      if (!res.ok) return;
+      users = (await res.json()).users;
+      renderUsers();
+    }
+
+    function renderUsers() {
+      const q = document.getElementById("search").value.trim().toLowerCase();
+      const filtered = users.filter(u =>
+        !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+
+      document.getElementById("empty-state").style.display = filtered.length ? "none" : "block";
+      document.getElementById("users-body").innerHTML = filtered.map(u => {
+        const pct = Math.min(100, Math.round(100 * u.usage.videos / u.limits.videos_per_month));
+        return `
+          <tr>
+            <td>
+              <div class="u-name">${escHtml(u.name)}</div>
+              <div class="u-email">${escHtml(u.email)}</div>
+            </td>
+            <td><span class="plan-pill ${u.plan === "pro" ? "pro" : ""}">${u.plan}</span></td>
+            <td>
+              ${u.usage.videos}/${u.limits.videos_per_month} videos
+              <div class="usage-bar"><div class="fill" style="width:${pct}%"></div></div>
+            </td>
+            <td>${fmtDate(u.created)}</td>
+            <td>${fmtDate(u.last_login)}</td>
+            <td>
+              <div class="row-actions">
+                <select class="plan-select" onchange="setPlan(${u.id}, this.value)">
+                  <option value="free" ${u.plan === "free" ? "selected" : ""}>Free</option>
+                  <option value="pro" ${u.plan === "pro" ? "selected" : ""}>Pro</option>
+                </select>
+                <button class="icon-btn danger" onclick="deleteUser(${u.id}, '${escHtml(u.email)}')">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join("");
+    }
+
+    async function setPlan(userId, plan) {
+      try {
+        const res = await fetch(`${API}/api/admin/users/${userId}/plan`, {
+          method: "POST", headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ plan }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || "Failed to update plan");
+        toast(`Plan updated to ${plan} ✓`);
+        await Promise.all([loadStats(), loadUsers()]);
+      } catch (e) {
+        toast(e.message, true);
+      }
+    }
+
+    async function deleteUser(userId, email) {
+      if (!confirm(`Delete ${email}? This removes their account permanently.`)) return;
+      try {
+        const res = await fetch(`${API}/api/admin/users/${userId}`, { method: "DELETE", headers: authHeaders() });
+        if (!res.ok) throw new Error((await res.json()).detail || "Failed to delete");
+        toast("User deleted");
+        await Promise.all([loadStats(), loadUsers()]);
+      } catch (e) {
+        toast(e.message, true);
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>

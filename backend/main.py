@@ -18,6 +18,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+import admin_auth
 import auth
 import config
 from pipeline.cache import get_cache, set_cache
@@ -94,6 +95,13 @@ def _update_job(job_id: str, **fields):
 
 
 _load_jobs()
+
+_bootstrapped_admin = admin_auth.bootstrap_admin()
+if _bootstrapped_admin:
+    log.warning(
+        "Created initial admin account — username=%s password=%s "
+        "(shown once; change it via POST /api/admin/change-password)",
+        *_bootstrapped_admin)
 
 
 class ClipSettings(BaseModel):
@@ -231,6 +239,95 @@ async def api_billing_upgrade(user: dict = Depends(require_user)):
     # Stripe (or another processor) is wired up with real API keys.
     auth.set_plan(user["id"], "pro")
     return {"plan": "pro"}
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminPlanRequest(BaseModel):
+    plan: str
+
+
+class AdminPasswordRequest(BaseModel):
+    new_password: str
+
+
+async def require_admin(authorization: Optional[str] = Header(None)) -> dict:
+    admin = admin_auth.get_admin(_bearer(authorization))
+    if not admin:
+        raise HTTPException(401, "Admin login required")
+    return admin
+
+
+@app.post("/api/admin/login")
+@limiter.limit("10/minute")
+async def api_admin_login(request: Request, req: AdminLoginRequest):
+    try:
+        token = admin_auth.login(req.username, req.password)
+    except admin_auth.AdminAuthError as e:
+        raise HTTPException(401, str(e))
+    return {"token": token}
+
+
+@app.post("/api/admin/logout")
+async def api_admin_logout(authorization: Optional[str] = Header(None)):
+    admin_auth.logout(_bearer(authorization))
+    return {"ok": True}
+
+
+@app.get("/api/admin/me")
+async def api_admin_me(admin: dict = Depends(require_admin)):
+    return admin
+
+
+@app.post("/api/admin/change-password")
+async def api_admin_change_password(req: AdminPasswordRequest, admin: dict = Depends(require_admin)):
+    try:
+        admin_auth.change_password(admin["id"], req.new_password)
+    except admin_auth.AdminAuthError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+async def api_admin_users(admin: dict = Depends(require_admin)):
+    users = auth.list_users()
+    for u in users:
+        u["usage"] = auth.get_usage(u["id"])
+        u["limits"] = config.PLAN_LIMITS[u["plan"]]
+    return {"users": users}
+
+
+@app.get("/api/admin/stats")
+async def api_admin_stats(admin: dict = Depends(require_admin)):
+    users = auth.list_users()
+    pro_count = sum(1 for u in users if u["plan"] == "pro")
+    total_videos_this_month = sum(auth.get_usage(u["id"])["videos"] for u in users)
+    total_jobs = len(jobs)
+    return {
+        "total_users": len(users),
+        "pro_users": pro_count,
+        "free_users": len(users) - pro_count,
+        "videos_this_month": total_videos_this_month,
+        "total_jobs_on_disk": total_jobs,
+    }
+
+
+@app.post("/api/admin/users/{user_id}/plan")
+async def api_admin_set_plan(user_id: int, req: AdminPlanRequest, admin: dict = Depends(require_admin)):
+    try:
+        auth.set_plan(user_id, req.plan)
+    except auth.AuthError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/admin/users/{user_id}")
+async def api_admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
+    auth.delete_account(user_id)
+    return {"deleted": True}
 
 
 @app.post("/api/process/youtube")

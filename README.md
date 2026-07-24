@@ -63,6 +63,8 @@ No Client Secret is needed — the backend verifies the ID token's signature and
 
 `frontend/pricing.html` auto-detects the visitor's country (via a free IP-geolocation lookup, [geojs.io](https://get.geojs.io)) and shows the matching tier, with a manual dropdown override in case detection is wrong or blocked. The mapping lives in that file's `COUNTRY_TIER`/`REGION_PRICE` objects — add countries or adjust prices there; `backend/config.py`'s `PRICING` only holds the "standard" tier number for when real billing is wired up (nothing charges different amounts by region yet — see the billing-stub note above).
 
+**Local currency display:** for a handful of countries (India today — `LOCAL_CURRENCY` in `pricing.html`) the price also renders in the local currency (₹249/mo, ₹199/mo annual) instead of USD, since showing a dollar sign to a local audience reads oddly. These are clean round numbers loosely pegged to the USD tier, not a live exchange-rate conversion — update them by hand if rates drift. Only applies when the country is *auto-detected*; picking a region manually from the dropdown always shows USD, since a tier alone doesn't imply one specific country's currency.
+
 **Why these numbers:** the pipeline is fully CPU-bound (Whisper + OpenCV/MediaPipe + ffmpeg, no GPU needed), so marginal compute cost per video is small — a few cents even for a 10-minute video on a modest VPS. Limits exist to bound worst-case load and give Free users a real reason to upgrade, not to maximize revenue — pricing is intentionally below the market rate (Opus.pro, Klap, Vidyo.ai sit at $15–30/mo) to stay accessible in more places.
 
 Limits live in `backend/config.py` (`PLAN_LIMITS`, `PRICING`) — change the numbers there, no other code changes needed. They're mirrored in `frontend/pricing.html`'s `LIMITS`/`PRICE` constants for display; keep both in sync if you tune them.
@@ -141,6 +143,23 @@ After processing you land in a full editor:
 | GET | `/healthz` | Liveness check (for uptime monitors / load balancers) |
 
 🔒 = requires `Authorization: Bearer <token>`, and (where a `job_id` is involved) that the token's user owns that job — every job-scoped endpoint 404s rather than leaking another user's data.
+
+### Admin API (`admin.html`)
+
+Separate username/password auth — deliberately not Google OAuth, since admins are operators, not customers. The first admin account is auto-created on first server startup; the username and one-time plaintext password are printed to the server log (search for "Created initial admin account") and nowhere else — change the password immediately via the dashboard.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/admin/login` | Username + password → admin session token |
+| POST | `/api/admin/logout` | Invalidate the admin session |
+| GET | `/api/admin/me` | Current admin 🔐 |
+| POST | `/api/admin/change-password` | Change the admin password 🔐 |
+| GET | `/api/admin/stats` | Total/free/pro users, videos this month, jobs on disk 🔐 |
+| GET | `/api/admin/users` | Every user with plan + usage + limits 🔐 |
+| POST | `/api/admin/users/{id}/plan` | Grant/change a user's plan (`free`/`pro`) 🔐 |
+| DELETE | `/api/admin/users/{id}` | Delete any user's account 🔐 |
+
+🔐 = requires an admin session token (separate token namespace from customer sessions — a customer token can never access these, verified in testing).
 
 ## Production checklist
 

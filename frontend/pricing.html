@@ -113,13 +113,13 @@
 
     <div class="region-row">
       <span id="region-label">Detecting your region…</span>
-      <select class="region-select" id="region-select" onchange="setRegion(this.value)">
+      <select class="region-select" id="region-select" onchange="setRegion(this.value, true)">
         <option value="a">🌍 US, UK, EU, Canada, Australia & similar</option>
         <option value="b">🌎 Brazil, Mexico, Eastern Europe, China & similar</option>
         <option value="c">🌏 India, Southeast Asia, Africa & similar</option>
       </select>
     </div>
-    <div class="region-note">Pricing is adjusted for where you are, in USD. Not right? Pick your region above.</div>
+    <div class="region-note" id="region-note">Pricing is adjusted for where you are, in USD. Not right? Pick your region above.</div>
 
     <div class="toggle-row">
       <span id="lbl-monthly" class="active">Monthly</span>
@@ -205,12 +205,28 @@
       MA:"c", DZ:"c", TN:"c",
     };
 
-    let region = "a";
+    // Local-currency display for markets where showing USD reads oddly.
+    // Prices are clean round local numbers (not a raw FX multiply — that's
+    // deliberate, "₹249" reads better than "₹248.73"), loosely pegged to
+    // the region tier's USD price. This is DISPLAY only — no real billing
+    // is connected yet (see backend/config.py), so nothing actually charges
+    // in these currencies until a payment processor is wired up. Update the
+    // numbers here if exchange rates drift significantly.
+    const LOCAL_CURRENCY = {
+      IN: { symbol: "₹", code: "INR", monthly: 249, annual: 199 },
+    };
 
-    function setRegion(r) {
+    let region = "a";
+    let currency = null;   // set when the detected (not manually picked) country has a LOCAL_CURRENCY entry
+
+    function setRegion(r, fromManualPick) {
       region = r;
+      if (fromManualPick) currency = null; // manual picks are tier-only — show USD
       document.getElementById("region-select").value = r;
       document.getElementById("region-label").textContent = REGION_PRICE[r].label + ":";
+      document.getElementById("region-note").textContent = currency
+        ? `Showing pricing in ${currency.code} for your region. Not right? Pick your region above.`
+        : "Pricing is adjusted for where you are, in USD. Not right? Pick your region above.";
       const annual = document.getElementById("annual-toggle").checked;
       toggleAnnual(annual);
     }
@@ -219,10 +235,13 @@
       try {
         const res = await fetch("https://get.geojs.io/v1/ip/country.json", { signal: AbortSignal.timeout(2500) });
         const data = await res.json();
-        const code = (data.country_code || "").toUpperCase();
-        setRegion(COUNTRY_TIER[code] || "a");
+        // geojs.io returns the ISO code under "country" (e.g. "IN"), not "country_code"
+        const code = (data.country || "").toUpperCase();
+        currency = LOCAL_CURRENCY[code] || null;
+        setRegion(COUNTRY_TIER[code] || "a", false);
       } catch {
-        setRegion("a"); // fail open to standard pricing if detection is blocked/unavailable
+        currency = null;
+        setRegion("a", false); // fail open to standard USD pricing if detection is blocked/unavailable
       }
     }
     detectRegion();
@@ -254,8 +273,14 @@
     function toggleAnnual(annual) {
       document.getElementById("lbl-monthly").classList.toggle("active", !annual);
       document.getElementById("lbl-annual").classList.toggle("active", annual);
-      const price = REGION_PRICE[region];
-      document.getElementById("pro-price").textContent = "$" + (annual ? price.annual : price.monthly);
+      let priceText;
+      if (currency) {
+        priceText = currency.symbol + (annual ? currency.annual : currency.monthly);
+      } else {
+        const price = REGION_PRICE[region];
+        priceText = "$" + (annual ? price.annual : price.monthly);
+      }
+      document.getElementById("pro-price").textContent = priceText;
       document.getElementById("pro-desc").textContent = annual
         ? "Billed annually — for creators posting regularly across formats."
         : "For creators posting regularly across formats.";

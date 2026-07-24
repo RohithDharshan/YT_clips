@@ -172,6 +172,16 @@ def get_user_by_id(user_id: int) -> dict | None:
     return {"id": row[0], "name": row[1], "email": row[2], "avatar": row[3], "plan": row[4]}
 
 
+def list_users() -> list[dict]:
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT id, name, email, avatar_url, plan, created, last_login FROM users "
+        "ORDER BY created DESC").fetchall()
+    conn.close()
+    return [{"id": r[0], "name": r[1], "email": r[2], "avatar": r[3], "plan": r[4],
+             "created": r[5], "last_login": r[6]} for r in rows]
+
+
 def delete_account(user_id: int):
     conn = _conn()
     conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
