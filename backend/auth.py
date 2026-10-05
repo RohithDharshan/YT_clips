@@ -15,6 +15,12 @@ import time
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
+import config  # noqa: F401 — side effect: loads backend/.env before we read os.environ below.
+                # Do NOT remove even though `config` isn't referenced directly: without
+                # it, GOOGLE_CLIENT_ID silently reads as "" whenever some other module
+                # happens to import `auth` before `config` (e.g. main.py's import order),
+                # since .env would not have been loaded into the process environment yet.
+
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../cache/users.db"))
 TOKEN_TTL = 30 * 86400  # 30 days
 

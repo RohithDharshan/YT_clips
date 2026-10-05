@@ -33,7 +33,8 @@ ClipMind accepts **Google accounts only** (restricted to `@gmail.com` by default
 2. **APIs & Services → OAuth consent screen** → configure it (External, fill in app name/logo/support email). Publishing status can stay in "Testing" while you develop.
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → Application type **Web application**.
 4. Under **Authorized JavaScript origins**, add every origin you'll load the frontend from, e.g.:
-   - `http://localhost:3005` (dev)
+   - `http://localhost:3000` (dev — matches `.claude/launch.json`'s static server)
+   - `http://localhost:3005` (alternate dev port, also in `ALLOWED_ORIGINS` by default)
    - `https://yourdomain.com` (production)
 5. Copy the generated **Client ID** (looks like `123...apps.googleusercontent.com`) into:
    - `backend/.env` → `GOOGLE_CLIENT_ID=...`
@@ -41,6 +42,10 @@ ClipMind accepts **Google accounts only** (restricted to `@gmail.com` by default
 6. Restart the backend. Until this is set, `login.html`/`signup.html` show a clear "Google sign-in isn't configured yet" message instead of a broken button.
 
 No Client Secret is needed — the backend verifies the ID token's signature and audience directly against Google's public keys (`google-auth` library), it never talks to Google with a secret.
+
+**Troubleshooting — "The given origin is not allowed" / Google redirects to an `invalid_client` error page:** the exact origin (scheme + host + port) you're loading the frontend from isn't in that Client ID's Authorized JavaScript origins list yet. Add it there — this is a Google Cloud Console setting, not something fixable in code. Common trip-up: `http://localhost:3000` and `http://localhost:3005` are *different* origins to Google even though they're both "localhost" — whichever port actually serves the frontend must be listed exactly.
+
+**Gotcha if you ever reorder backend imports:** `auth.py` reads `GOOGLE_CLIENT_ID` from `os.environ` at import time, and only `config.py` actually loads `.env` into the environment. `auth.py` now explicitly `import config` first as a guard (see the comment there) — don't remove that import even though it looks unused, or `.env` silently stops being read whenever some other module happens to import `auth` before `config` does.
 
 ## Pricing
 

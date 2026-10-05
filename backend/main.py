@@ -18,9 +18,9 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+import config  # must import first — loads .env before any module reads os.environ
 import admin_auth
 import auth
-import config
 from pipeline.cache import get_cache, set_cache
 from pipeline.clipper import generate_clips, render_single_clip
 from pipeline.downloader import download_youtube
